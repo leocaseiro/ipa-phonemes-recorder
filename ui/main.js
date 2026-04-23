@@ -478,6 +478,13 @@ function applyTakeLocally(phonemeId, take) {
     rms_db: take.rms_db,
     notes: "",
   });
+  // Mirror the server's high-water mark so a later PUT /state does
+  // not send a stale value and cause the counter to rewind.
+  const takeNum = parseInt(take.take_id.slice(5), 10);
+  if (Number.isInteger(takeNum)) {
+    const current = phonemes[phonemeId].max_take_id ?? 0;
+    if (takeNum > current) phonemes[phonemeId].max_take_id = takeNum;
+  }
   currentBank.state.last_phoneme_id = phonemeId;
   renderPhonemeList(currentBank);
   selectPhoneme(phonemeId, { preferTakeId: take.take_id });

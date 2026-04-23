@@ -52,12 +52,28 @@ class TakeNotFound(Exception):
 
 
 def next_take_id(phoneme_dir: Path, state: dict, phoneme_id: str) -> str:
+    """Next id to assign for a new take of `phoneme_id`.
+
+    Spec §6.3 / plan §10.3 step 4: take IDs are monotonic per phoneme
+    and are **never reused** even after delete. The source of truth for
+    "has this id ever existed?" is `state.phonemes[pid].max_take_id`,
+    a persisted high-water mark that is bumped on save and never
+    decremented. Current state and disk are also consulted so the
+    first write against a pre-existing raw/ directory still picks a
+    safe id.
+    """
     max_n = 0
     phoneme_state = state.get("phonemes", {}).get(phoneme_id, {})
-    for take in phoneme_state.get("takes", []):
-        m = TAKE_ID_RE.match(take.get("id", ""))
-        if m:
-            max_n = max(max_n, int(m.group(1)))
+    if isinstance(phoneme_state, dict):
+        stored = phoneme_state.get("max_take_id")
+        if isinstance(stored, int) and stored > max_n:
+            max_n = stored
+        for take in phoneme_state.get("takes", []):
+            if not isinstance(take, dict):
+                continue
+            m = TAKE_ID_RE.match(take.get("id", ""))
+            if m:
+                max_n = max(max_n, int(m.group(1)))
     if phoneme_dir.is_dir():
         for wav in phoneme_dir.iterdir():
             if wav.suffix != ".wav":
@@ -151,6 +167,10 @@ def save_take(
             "notes": "",
         }
     )
+    new_number = int(take_id.removeprefix("take-"))
+    current_high = phoneme_entry.get("max_take_id")
+    if not isinstance(current_high, int) or new_number > current_high:
+        phoneme_entry["max_take_id"] = new_number
     state["last_phoneme_id"] = phoneme_id
     write_state(bank_path, state)
 
