@@ -528,3 +528,221 @@ None automated (browser-only). Manual checks listed below.
   replaces it with a proper endpoint + UI list.)
 - Deny mic permission → banner with re-enable instructions appears,
   record button stays disabled.
+
+---
+
+## 10. Milestone 4 — Take recording
+
+**Goal:** Pressing Record (button or `R`) captures mic audio, uploads
+it on stop, the server transcodes to WAV, computes metadata, updates
+`state.json`, and the UI shows the new take in the list. End-to-end
+happy path from mic → disk.
+
+### 10.1 Files created / modified
+
+| Path | Change |
+|---|---|
+| `server/takes.py` | `save_take(bank_path, phoneme_id, src_bytes, src_ext) -> TakeMeta`. Writes WebM to `tmp/`, transcodes to `raw/<pid>/take-NNN.wav` at 48 kHz mono, computes metadata, updates `state.json`, cleans tmp. |
+| `server/audio_meta.py` | Pure stdlib `wave` + `math`: `compute_peak_rms(path: Path) -> tuple[float, float, int]` returning `(peak_db, rms_db, duration_ms)`. Handles 16-bit PCM only in v1 (we control the encode, so this is safe). |
+| `server/app.py` | Add `POST /api/banks/:id/phonemes/:pid/takes` handler. |
+| `ui/record.js` | MediaRecorder wrapper: `startRecording()`, `stopRecording() -> Blob`, `onError`. Supports Opus-in-WebM. |
+| `ui/main.js` | Wire record button + `R` key, POST blob on stop, refresh detail pane. |
+| `ui/styles.css` | Recording state: pulsing red circle on the button, disabled state for non-record controls while active. |
+| `tests/test_takes.py` | Numbering, metadata, transcode invocation (mocked). |
+| `tests/test_audio_meta.py` | Peak/RMS math against a known fixture WAV. |
+| `tests/fixtures/audio/sine_-6dbfs_440hz_500ms.wav` | Deterministic 48 kHz mono 16-bit fixture for audio_meta tests. |
+
+### 10.2 Endpoint
+
+```
+POST /api/banks/:id/phonemes/:pid/takes
+Content-Type: audio/webm   (or audio/wav if the browser produces it)
+Body: raw audio bytes
+
+201 Created
+{
+  "take_id": "take-003",
+  "duration_ms": 642,
+  "peak_db": -2.3,
+  "rms_db": -18.1,
+  "created_at": "2026-04-23T10:14:00Z"
+}
+```
+
+Errors:
+
+- `404` if bank or phoneme not found.
+- `413` if body > 50 MB (sanity cap; a take is seconds long).
+- `415` if `Content-Type` is not `audio/webm`, `audio/ogg`, or
+  `audio/wav`.
+- `500` with the `error.code = "ffmpeg_failed"` if transcode fails;
+  the temp file stays for debugging and is logged.
+
+### 10.3 Take numbering rule
+
+From spec §6.3: IDs are monotonic and **never reused**. Implementation:
+
+1. Read `state.json.phonemes[pid].takes`, collect existing IDs.
+2. Also scan `raw/<pid>/` for any orphaned WAVs.
+3. Parse each `take-NNN` → int; next ID = `max(existing) + 1`,
+   zero-padded to 3 digits. If no existing IDs, start at `001`.
+4. Deletes never decrement this counter — if 002 is deleted, the next
+   recording is 003, even if only 001 remains on disk.
+
+### 10.4 ffmpeg invocation
+
+```
+ffmpeg -y -i <tmp.webm> \
+  -ar 48000 -ac 1 -c:a pcm_s16le \
+  <raw/<pid>/take-NNN.wav>
+```
+
+48 kHz capture preserves headroom for the export resample to
+22.05 kHz (spec §12 step 3). 16-bit PCM mono keeps files small
+(~100 kB per take) and makes `audio_meta` trivial.
+
+### 10.5 State update
+
+On successful transcode, atomically update `state.json`:
+
+```python
+state["phonemes"].setdefault(phoneme_id, {
+    "keeper_take": None,
+    "takes": [],
+})
+state["phonemes"][phoneme_id]["takes"].append({
+    "id": take_id,
+    "created_at": iso_now(),
+    "duration_ms": duration_ms,
+    "peak_db": peak_db,
+    "rms_db": rms_db,
+    "notes": "",
+})
+state["last_phoneme_id"] = phoneme_id
+write_state(bank_path, state)
+```
+
+### 10.6 UI flow
+
+- `R` or click on record button → `startRecording()` → button enters
+  red-pulse state, shows elapsed seconds.
+- `R` again or click → `stopRecording()` → get Blob → POST via
+  `api.js`.
+- On 201: append the new take to the in-memory takes list, select
+  it, render waveform.
+- On error: toast with `error.message`; do not mutate UI state.
+
+### 10.7 Tests
+
+- `test_audio_meta.py`:
+  - `test_peak_rms_of_known_sine` — the -6 dBFS fixture must produce
+    `peak_db ≈ -6.0` (±0.5) and `rms_db ≈ -9.0` (±0.5). Duration must
+    equal 500 ms ±5.
+- `test_takes.py`:
+  - `test_next_take_id_starts_at_001_when_empty`
+  - `test_next_take_id_is_max_plus_one`
+  - `test_next_take_id_ignores_deleted_state_entries` (max comes
+    from disk scan, not just state)
+  - `test_save_take_writes_wav_and_updates_state` (mock ffmpeg
+    subprocess by replacing it with a stub that writes a fixture WAV)
+  - `test_save_take_rolls_back_state_on_ffmpeg_failure`
+  - `test_save_take_rejects_unknown_phoneme_id`
+
+### 10.8 Acceptance
+
+- Record a 1-second "shhh" in the UI, stop, observe:
+  - `raw/sh/take-001.wav` appears, ~96 kB, playable in `afplay`.
+  - `state.json` gains the take entry with plausible metadata.
+  - UI shows the take row with duration, peak, rms.
+- Record a second take, delete `take-001` by hand from
+  `state.json`, record a third — it must be `take-003`, not
+  `take-002`.
+- All new tests green.
+
+---
+
+## 11. Milestone 5 — Take playback, keeper selection, delete
+
+**Goal:** The takes list in the centre panel is fully interactive.
+The user can play any take (`Space`), choose the keeper (`Enter`),
+and delete takes (`Backspace` with one-step confirm). All changes
+survive a reload.
+
+### 11.1 Files modified
+
+| Path | Change |
+|---|---|
+| `server/app.py` | Add GET / DELETE handlers for individual takes, PUT handler for state. |
+| `server/state.py` | `update_keeper(state, pid, take_id)` — sets `keeper_take`, clears on any other take. Validates `take_id` exists in `takes`. |
+| `server/takes.py` | `delete_take(bank_path, pid, take_id)` — remove WAV, remove state entry, clear keeper if it was this take. Does not renumber siblings. |
+| `ui/takes.js` | New module. Renders takes list, wires per-row play / keeper radio / delete buttons. |
+| `ui/main.js` | Keyboard shortcuts: `Space`, `Enter`, `Backspace`. |
+| `ui/styles.css` | Takes list layout, keeper radio styling, confirm-dialog overlay. |
+| `tests/test_takes.py` | Extend with delete tests. |
+| `tests/test_state.py` | Extend with keeper tests. |
+
+### 11.2 Endpoints
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/banks/:id/phonemes/:pid/takes/:tid` | WAV bytes, `Content-Type: audio/wav`, `Content-Length` set. 404 if missing. |
+| DELETE | `/api/banks/:id/phonemes/:pid/takes/:tid` | 204 on success. 404 if missing. |
+| PUT | `/api/banks/:id/state` | Request body is the full state JSON; server validates shape, writes atomically. 200 with the stored state. 422 on invalid shape. |
+
+The PUT-full-state approach keeps the client simple and avoids a
+proliferation of micro-endpoints. The UI already has the full state
+in memory; sending it back whole is cheap and the autosave is on a
+per-action basis (spec §10.3).
+
+### 11.3 Validation on PUT state
+
+Reject if:
+
+- Shape doesn't match the schema from spec §8.2.
+- Any `keeper_take` references a missing take.
+- More than one keeper in a phoneme (shouldn't happen; defensive).
+- `takes` entries reference WAV files that don't exist on disk
+  (warning, not rejection — disk is source of truth; state can
+  lag briefly).
+
+### 11.4 UI interactions
+
+- Takes list row: `[▶ Play]  take-002  642 ms  peak −2.3 dB  rms −18.1 dB  ( ) Keeper  [🗑]`
+- Click Play or press `Space`: fetch take, decode via
+  `AudioContext.decodeAudioData`, play once. While playing, Play
+  button becomes Stop.
+- Click Keeper radio or press `Enter`: optimistic UI update, PUT
+  state, roll back on failure. Status glyph in the left panel flips
+  to `✓`.
+- Click 🗑 or press `Backspace`: show inline confirm ("Delete
+  take-002? [Delete] [Cancel]"). On confirm: DELETE request,
+  optimistic removal, on failure re-insert row and toast.
+
+### 11.5 Tests
+
+- `test_takes.py` additions:
+  - `test_delete_removes_wav_and_state_entry`
+  - `test_delete_clears_keeper_if_it_was_this_take`
+  - `test_delete_preserves_sibling_take_ids` (deleting 002 does not
+    renumber 003 to 002)
+  - `test_delete_nonexistent_returns_404`
+  - `test_serve_wav_sets_content_type` (via endpoint test)
+- `test_state.py` additions:
+  - `test_update_keeper_sets_flag`
+  - `test_update_keeper_clears_previous`
+  - `test_update_keeper_rejects_unknown_take_id`
+  - `test_put_state_roundtrip` (endpoint: PUT then GET, content
+    equal)
+
+### 11.6 Acceptance
+
+- Record 3 takes of `sh`. Pick take-002 as keeper. Reload the page.
+  Status glyph for `sh` is `✓`, take-002 is selected.
+- Delete take-001. Take list shows only 002 and 003 with original
+  IDs (no renumbering). Keeper unchanged.
+- Delete take-002 (the keeper). Keeper clears; status glyph reverts
+  to `●` (has takes, no keeper).
+- Manual: kill the server mid-PUT (SIGKILL), restart, verify
+  `state.json` is either the pre-PUT or post-PUT snapshot, never a
+  half-written mess.
+- All new tests green.
