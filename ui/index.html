@@ -22,11 +22,31 @@
           </select>
         </label>
         <span id="privacy-badge" class="privacy-badge privacy-badge--unknown" hidden></span>
+        <button id="export-button" class="export-button" type="button">
+          Export <kbd>E</kbd>
+        </button>
         <div id="health-banner" class="health-banner health-banner--unknown">
           Checking tools…
         </div>
       </div>
     </header>
+    <div
+      id="export-modal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="export-modal-title"
+      hidden
+    >
+      <div class="modal__backdrop" data-action="close-modal"></div>
+      <div class="modal__card">
+        <h2 id="export-modal-title" class="modal__title">Export</h2>
+        <div id="export-modal-body" class="modal__body"></div>
+        <div class="modal__actions">
+          <button type="button" class="modal__btn" data-action="close-modal">Close</button>
+        </div>
+      </div>
+    </div>
 
     <aside class="left-panel" aria-label="Phoneme list">
       <ul id="phoneme-list" class="phoneme-list"></ul>

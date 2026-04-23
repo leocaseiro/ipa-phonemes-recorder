@@ -10,6 +10,7 @@ import {
   getReference,
   getReferenceSources,
   getTakeWav,
+  postExport,
   postTake,
   putState,
 } from "/ui/api.js";
@@ -33,6 +34,9 @@ const micGrantButton = document.getElementById("mic-grant");
 const micDeviceLabel = document.getElementById("mic-device");
 const micErrorBanner = document.getElementById("mic-error");
 const meterCanvas = document.getElementById("meter-canvas");
+const exportButton = document.getElementById("export-button");
+const exportModal = document.getElementById("export-modal");
+const exportModalBody = document.getElementById("export-modal-body");
 
 const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
@@ -73,6 +77,10 @@ async function init() {
   micGrantButton.addEventListener("click", grantMicAndStartMeter);
   recordButton.addEventListener("click", toggleRecording);
   phonemeDetail.addEventListener("click", handleDetailClick);
+  exportButton.addEventListener("click", runExport);
+  exportModal.addEventListener("click", (event) => {
+    if (event.target?.dataset?.action === "close-modal") closeExportModal();
+  });
   phonemeDetail.addEventListener("change", (e) => {
     if (e.target?.id === "ref-source") {
       localStorage.setItem("reference_source", e.target.value);
@@ -335,6 +343,16 @@ function handleKeyDown(event) {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
+  // Export modal acts as a modal: Escape closes it, every other
+  // shortcut is ignored while it's open.
+  if (!exportModal.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeExportModal();
+    }
+    return;
+  }
+
   // Delete-confirm acts as a modal: only Enter confirms and Escape cancels;
   // every other shortcut is ignored until the user resolves it.
   if (pendingDeleteTakeId) {
@@ -401,6 +419,114 @@ function handleKeyDown(event) {
     playReference();
     return;
   }
+
+  if (event.key === "e" || event.key === "E") {
+    if (!currentBank) return;
+    event.preventDefault();
+    runExport();
+    return;
+  }
+}
+
+async function runExport() {
+  if (!currentBank) return;
+  const bankId = bankSelect.value;
+  if (!bankId) return;
+  openExportModal({ pending: true });
+  try {
+    const summary = await postExport(bankId, { onMissingKeeper: "skip" });
+    openExportModal({ summary, bankId });
+  } catch (err) {
+    openExportModal({ error: err, bankId });
+  }
+}
+
+function openExportModal({ pending, summary, error, bankId }) {
+  exportModal.hidden = false;
+  document.body.classList.add("modal-open");
+
+  if (pending) {
+    exportModalBody.innerHTML = `<p class="modal__pending">Exporting bank — running ffmpeg…</p>`;
+    return;
+  }
+
+  if (summary) {
+    const skippedHtml = (summary.skipped ?? []).length
+      ? `<details class="modal__details">
+           <summary>${summary.skipped.length} phoneme(s) skipped (no keeper)</summary>
+           <ul class="modal__skipped">
+             ${summary.skipped
+               .map(
+                 (s) =>
+                   `<li><code>${escapeHtml(s.id)}</code> (${escapeHtml(s.ipa)}) — ${escapeHtml(s.reason)}</li>`,
+               )
+               .join("")}
+           </ul>
+         </details>`
+      : "";
+    exportModalBody.innerHTML = `
+      <p class="modal__status modal__status--ok">Export complete</p>
+      <dl class="modal__stats">
+        <dt>Exported</dt><dd>${summary.exported_count} / ${summary.phoneme_count}</dd>
+        <dt>Duration</dt><dd>${formatDuration(summary.duration_ms)}</dd>
+        <dt>MP3</dt><dd>${formatBytes(summary.mp3_bytes)}</dd>
+        <dt>Manifest</dt><dd>${formatBytes(summary.manifest_bytes)}</dd>
+      </dl>
+      <p class="modal__paths">
+        <code>banks/${escapeHtml(bankId)}/dist/phonemes.mp3</code><br>
+        <code>banks/${escapeHtml(bankId)}/dist/phonemes.json</code>
+      </p>
+      ${skippedHtml}
+    `;
+    return;
+  }
+
+  if (error) {
+    const code = error.body?.error ?? "error";
+    const message = error.body?.message ?? error.message;
+    const detail = error.body?.detail ?? "";
+    const skipped = error.body?.skipped ?? [];
+    const skippedHtml = skipped.length
+      ? `<details class="modal__details" open>
+           <summary>${skipped.length} phoneme(s) without a keeper</summary>
+           <ul class="modal__skipped">
+             ${skipped
+               .map(
+                 (s) =>
+                   `<li><code>${escapeHtml(s.id)}</code> (${escapeHtml(s.ipa)}) — ${escapeHtml(s.reason)}</li>`,
+               )
+               .join("")}
+           </ul>
+         </details>`
+      : "";
+    const detailHtml = detail
+      ? `<pre class="modal__stderr">${escapeHtml(detail.slice(0, 1500))}</pre>`
+      : "";
+    exportModalBody.innerHTML = `
+      <p class="modal__status modal__status--bad">Export failed · <code>${escapeHtml(code)}</code></p>
+      <p>${escapeHtml(message)}</p>
+      ${skippedHtml}
+      ${detailHtml}
+    `;
+  }
+}
+
+function closeExportModal() {
+  exportModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
+function formatDuration(ms) {
+  if (!Number.isFinite(ms)) return "—";
+  if (ms < 1000) return `${ms} ms`;
+  return `${(ms / 1000).toFixed(2)} s`;
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes)) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} kB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
 }
 
 async function playReference() {
