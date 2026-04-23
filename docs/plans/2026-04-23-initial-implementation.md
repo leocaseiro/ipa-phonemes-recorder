@@ -68,7 +68,7 @@ spin-off if its ffmpeg filter graph proves fiddly in practice.
 ### 2.1 Host tools (must be on `PATH`)
 
 | Tool | Minimum | Used for | Detection |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | `python3` | 3.10 | Server + scripts | `python3 --version` |
 | `ffmpeg` | any recent | Transcode WebM→WAV, silence-trim, loudness-norm, MP3 encode | `which ffmpeg` |
 | `espeak-ng` | any recent | Reference-audio fallback | `which espeak-ng` |
@@ -219,7 +219,7 @@ extend to code milestones, which return to the branch-per-PR flow.
 ### 5.1 What we test
 
 | Layer | Tool | Scope |
-|---|---|---|
+| --- | --- | --- |
 | Python modules | `unittest` (stdlib) | Schema validation, state I/O, take metadata math, export pipeline, gitignore sync |
 | HTTP endpoints | `unittest` against in-process `http.server` | Route wiring, status codes, request/response shapes |
 | ffmpeg pipeline | Golden-file comparison on manifest; tolerance-based compare on MP3 | Manifest JSON exact-match; MP3 duration and sample-rate within bounds |
@@ -313,7 +313,7 @@ empty four-zone layout with a health banner driven by
 ### 7.1 Files created
 
 | Path | Role |
-|---|---|
+| --- | --- |
 | `server/__init__.py` | Package marker (empty). |
 | `server/app.py` | Entry point. Argparse (`--port`, `--repo-root`), tool probe, `ThreadingHTTPServer`, route table, static-file handler. |
 | `ui/index.html` | Four-zone skeleton: top bar, left panel, centre panel, bottom meter zone. Placeholders only. |
@@ -340,7 +340,7 @@ class ServerConfig:
 Route table (starting set; later milestones append rows):
 
 | Method | Path | Handler | Milestone |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | GET | `/` | serve `ui/index.html` | M1 |
 | GET | `/ui/<path>` | serve `ui/` static files (whitelist extensions) | M1 |
 | GET | `/api/health` | `{"ok": true, "tools": {"ffmpeg": bool, "espeak_ng": bool}, "version": "0.1.0"}` | M1 |
@@ -392,7 +392,7 @@ IPA glyph and example word in the centre panel. No recording yet.
 ### 8.1 Files created
 
 | Path | Role |
-|---|---|
+| --- | --- |
 | `server/schema.py` | `validate_config(config: dict) -> list[str]` returns list of errors (empty on success). `REQUIRED_FIELDS`, `PRIVACY_VALUES`, `PHONEME_FIELDS` as module constants. |
 | `server/banks.py` | `list_banks(repo_root) -> list[BankSummary]`; `read_bank(repo_root, bank_id) -> BankDetail`; raises `BankNotFound`, `BankInvalid`. |
 | `server/state.py` | `read_state(bank_path) -> dict` (empty dict if missing or corrupt — corrupt file gets renamed to `state.json.corrupt-<ts>` per spec §14); `write_state(bank_path, state)` via temp-plus-rename. |
@@ -408,7 +408,7 @@ IPA glyph and example word in the centre panel. No recording yet.
 ### 8.2 Endpoints added
 
 | Method | Path | Response |
-|---|---|---|
+| --- | --- | --- |
 | GET | `/api/banks` | `{"banks": [{"id", "name", "locale", "privacy", "phoneme_count"}, ...]}` |
 | GET | `/api/banks/:id` | `{"config": {...}, "state": {...}}` — or `404` if bank missing, `422` if config invalid with the validator errors list |
 
@@ -477,7 +477,7 @@ Browser-only milestone. Zero server changes. All code in `ui/`.
 ### 9.2 Files created / modified
 
 | Path | Change |
-|---|---|
+| --- | --- |
 | `ui/audio.js` | Audio graph owner. Exports: `requestMic()`, `startMeter(onLevel)`, `stopMeter()`, `renderWaveform(canvas, arrayBuffer)`. Named exports only. |
 | `ui/main.js` | Wire mic grant UI, meter updates (rAF loop), placeholder waveform when a take WAV is hand-dropped into the fixture. |
 | `ui/styles.css` | Meter styles (vertical bar, peak hold), waveform canvas styles. |
@@ -541,7 +541,7 @@ happy path from mic → disk.
 ### 10.1 Files created / modified
 
 | Path | Change |
-|---|---|
+| --- | --- |
 | `server/takes.py` | `save_take(bank_path, phoneme_id, src_bytes, src_ext) -> TakeMeta`. Writes WebM to `tmp/`, transcodes to `raw/<pid>/take-NNN.wav` at 48 kHz mono, computes metadata, updates `state.json`, cleans tmp. |
 | `server/audio_meta.py` | Pure stdlib `wave` + `math`: `compute_peak_rms(path: Path) -> tuple[float, float, int]` returning `(peak_db, rms_db, duration_ms)`. Handles 16-bit PCM only in v1 (we control the encode, so this is safe). |
 | `server/app.py` | Add `POST /api/banks/:id/phonemes/:pid/takes` handler. |
@@ -671,7 +671,7 @@ survive a reload.
 ### 11.1 Files modified
 
 | Path | Change |
-|---|---|
+| --- | --- |
 | `server/app.py` | Add GET / DELETE handlers for individual takes, PUT handler for state. |
 | `server/state.py` | `update_keeper(state, pid, take_id)` — sets `keeper_take`, clears on any other take. Validates `take_id` exists in `takes`. |
 | `server/takes.py` | `delete_take(bank_path, pid, take_id)` — remove WAV, remove state entry, clear keeper if it was this take. Does not renumber siblings. |
@@ -684,7 +684,7 @@ survive a reload.
 ### 11.2 Endpoints
 
 | Method | Path | Response |
-|---|---|---|
+| --- | --- | --- |
 | GET | `/api/banks/:id/phonemes/:pid/takes/:tid` | WAV bytes, `Content-Type: audio/wav`, `Content-Length` set. 404 if missing. |
 | DELETE | `/api/banks/:id/phonemes/:pid/takes/:tid` | 204 on success. 404 if missing. |
 | PUT | `/api/banks/:id/state` | Request body is the full state JSON; server validates shape, writes atomically. 200 with the stored state. 422 on invalid shape. |
@@ -746,3 +746,315 @@ Reject if:
   `state.json` is either the pre-PUT or post-PUT snapshot, never a
   half-written mess.
 - All new tests green.
+
+---
+
+## 12. Milestone 6 — Reference audio
+
+**Goal:** `G` (or the "Play reference" button) plays an authoritative
+reference for the selected phoneme. If the Wikimedia OGG has been
+fetched it plays that (with an attribution line); otherwise the
+server synthesises via espeak-ng and streams the result. The export
+pipeline is provably isolated from `references/`.
+
+### 12.1 Files created
+
+| Path | Role |
+| --- | --- |
+| `scripts/fetch_references.py` | Standalone downloader. Reads the embedded `(pid, url, attribution, uploader)` table, downloads each OGG via `urllib.request`, writes `references/<pid>.ogg`, appends a row to `references/ATTRIBUTION.md`. Idempotent (skips present files, skips already-attributed rows). |
+| `server/references.py` | `serve_reference(bank_path, phoneme, references_root) -> (bytes, content_type)`. First try `references/<pid>.ogg`; on miss, call `espeak_fallback(phoneme) -> wav_bytes`. |
+| `server/seeds/english-basic.json` | The ~44-entry default phoneme inventory (referenced from M2 onward; created here at the latest). |
+| `server/seeds/ipa_espeak_map.json` | Static map: `{"ʃ": "[[S]]", "θ": "[[T]]", ...}`. Used only by the espeak-ng fallback; not part of any bank's config. Adding phonemes to this map is an implementation follow-up, not a config change. |
+| `ui/reference.js` | `playReference(bankId, phonemeId)` — fetch, play via AudioContext, show attribution overlay for the OGG case. |
+| `ui/main.js` | Wire `G` key and "Play reference" button. |
+| `references/ATTRIBUTION.md` | Created on first fetch; header + one row per downloaded file. |
+| `tests/test_references.py` | Fallback logic + isolation guarantee tests. |
+
+### 12.2 Endpoint
+
+```
+GET /api/banks/:id/phonemes/:pid/reference
+
+200 OK
+Content-Type: audio/ogg          (or audio/wav for the espeak fallback)
+X-Reference-Source: wikimedia    (or espeak)
+X-Reference-Attribution: ...     (only when source=wikimedia)
+Body: audio bytes
+```
+
+Errors:
+
+- `404` if the bank or phoneme id does not exist.
+- `502` if espeak-ng fallback is required but the binary is missing
+  or exits non-zero (`error.code = "espeak_unavailable"` or
+  `"espeak_failed"`).
+- Never `500` for "no reference available" — a missing reference is
+  a routine case handled by the fallback.
+
+### 12.3 Fetch script behaviour
+
+Embedded constant `WIKIMEDIA_REFERENCES: list[ReferenceEntry]` in
+`scripts/fetch_references.py`:
+
+```python
+@dataclass(frozen=True)
+class ReferenceEntry:
+    phoneme_id: str       # matches config.json.phonemes[].id
+    ipa: str              # sanity check vs the seed inventory
+    url: str              # https://upload.wikimedia.org/... .ogg
+    licence: str          # "CC BY-SA 3.0" etc.
+    uploader: str         # Commons username
+    commons_page: str     # https://commons.wikimedia.org/... (for ATTRIBUTION.md)
+```
+
+Runtime:
+
+1. Verify `ffmpeg` and `espeak-ng` are reachable — warn but proceed
+   if not (this script only needs `urllib`, but warning prevents
+   running the recorder afterward with missing tools).
+2. For each entry, if `references/<pid>.ogg` exists, skip.
+3. Otherwise `urllib.request.urlopen(url)` with a 20 s timeout and
+   a User-Agent string that identifies the tool and gives a repo URL
+   (Wikimedia asks for this).
+4. Stream to `references/<pid>.ogg.part`, then `os.replace` to final
+   name on success.
+5. If `ATTRIBUTION.md` doesn't mention this file yet, append a row.
+6. Print a summary (`downloaded N, skipped M, failed K`). Non-zero
+   exit iff any entry failed.
+
+The initial reference list is seeded from the two Wikipedia pages
+cited in the handoff:
+
+- https://en.wikipedia.org/wiki/IPA_consonant_chart_with_audio
+- https://en.wikipedia.org/wiki/IPA_vowel_chart_with_audio
+
+Compiling the precise URL table is an implementation task within
+this milestone — a one-off scrape captured as a static list in the
+script. No runtime scraping.
+
+### 12.4 espeak-ng fallback
+
+For a phoneme without a cached OGG:
+
+1. Look up `phoneme.ipa` in `server/seeds/ipa_espeak_map.json` to
+   find the Kirshenbaum fragment (e.g., `ʃ` → `[[S]]`).
+2. If the IPA is unmapped, return 502 with
+   `error.code = "espeak_no_mapping"` and log.
+3. Invoke:
+
+   ```
+   espeak-ng -v en -s 120 --stdout "<kirshenbaum>"
+   ```
+
+   Capture stdout as WAV bytes. 16 kHz mono is fine for a reference
+   clip.
+4. Stream the bytes back with `Content-Type: audio/wav` and
+   `X-Reference-Source: espeak`.
+
+No disk I/O for the fallback — the WAV lives entirely in memory.
+
+### 12.5 Isolation guarantee
+
+`server/export.py` (M7) **must not** open any path outside the
+bank's own root. The export test harness patches `builtins.open` to
+record every path read during an export call and asserts none start
+with `references/`. This is not a best-effort lint; it is an
+assertion that fails the build.
+
+### 12.6 Tests
+
+- `test_references.py`:
+  - `test_serve_ogg_when_present` — drop a fixture `sh.ogg` into a
+    temp references dir, assert bytes match and Content-Type is
+    `audio/ogg`.
+  - `test_attribution_header_set_for_ogg_source`.
+  - `test_espeak_fallback_invoked_when_ogg_missing` — mock
+    `subprocess.run` to return a canned WAV, assert it was called
+    with expected args and the response carries it.
+  - `test_espeak_unavailable_returns_502` — mock `shutil.which` to
+    return None.
+  - `test_espeak_no_mapping_returns_502` — phoneme with IPA not in
+    the map.
+- `test_export.py` (landed here but exercised in M7):
+  - `test_export_never_opens_references_dir` — see §12.5.
+
+### 12.7 Acceptance
+
+- Run `python3 scripts/fetch_references.py` → OGGs appear under
+  `references/`, `ATTRIBUTION.md` lists each with its Commons
+  uploader + licence.
+- In the UI, select `ʃ`, press `G` → Wikimedia OGG plays; brief
+  attribution line visible during playback.
+- Delete `references/sh.ogg` → press `G` → espeak-ng synthesis plays;
+  no attribution line shown.
+- Unit tests green, including the export isolation test.
+
+---
+
+## 13. Milestone 7 — Export pipeline
+
+**Goal:** `E` (or "Export bank") writes `dist/phonemes.mp3` +
+`dist/phonemes.json` whose manifest matches BaseSkill's expected
+shape exactly and whose MP3 plays at the correct offsets when
+dropped into BaseSkill's `public/audio/`.
+
+### 13.1 Files created
+
+| Path | Role |
+| --- | --- |
+| `server/export.py` | Full pipeline: read config+state, select keepers, run ffmpeg filter chain per keeper into `tmp/`, concat with silent gaps, encode MP3, build manifest with cumulative offsets, write `dist/`. |
+| `server/ffmpeg_util.py` | Thin subprocess wrappers: `run(cmd, *, check=True) -> CompletedProcess`; `probe_duration_ms(path) -> int` via `ffprobe`. Also: `FFmpegError` with stderr captured. |
+| `tests/test_export.py` | Golden manifest comparison + MP3 property bounds + mode tests + isolation test. |
+| `tests/fixtures/banks/en-test/raw/sh/take-001.wav` | Keeper WAV used by the export test. |
+| `tests/fixtures/banks/en-test/raw/k/take-001.wav` | Keeper WAV. |
+| `tests/fixtures/banks/en-test/raw/ee/take-001.wav` | Keeper WAV. |
+| `tests/fixtures/golden/phonemes.json` | Byte-exact expected manifest for the en-test fixture. |
+| `tests/fixtures/golden/phonemes-meta.json` | Total duration + per-phoneme tolerance. |
+| `ui/export.js` | Fire the POST, render the summary modal. |
+| `ui/main.js` | Wire `E` key and "Export bank" button. |
+
+### 13.2 Endpoint
+
+```
+POST /api/banks/:id/export
+Content-Type: application/json
+{
+  "on_missing_keeper": "skip" | "fail"   // default "skip"
+}
+
+200 OK
+{
+  "phoneme_count": 44,
+  "exported_count": 42,
+  "skipped": [
+    { "id": "zh", "ipa": "ʒ", "reason": "no keeper" }
+  ],
+  "duration_ms": 21640,
+  "mp3_bytes": 152418,
+  "manifest_bytes": 2103,
+  "warnings": []
+}
+```
+
+Errors:
+
+- `400 zero_keepers` if no phoneme in the bank has a keeper take.
+- `400 missing_keepers` if `on_missing_keeper == "fail"` and any
+  phoneme is missing a keeper; include the list in the response.
+- `409 gitignore_drift` if the bank is private but its
+  `.gitignore` does not contain `dist/` (Milestone 8 auto-fixes;
+  this is a defensive catch for M7-only deployments).
+- `500 ffmpeg_failed` with the stderr of the first failing call in
+  `error.detail`.
+
+### 13.3 Pipeline steps (spec §12 restated with concrete calls)
+
+**Step 1 — Collect keepers.** Iterate `config.phonemes`. For each,
+look up `state.phonemes[id].keeper_take`. Absent → per
+`on_missing_keeper`. Present → record
+`(phoneme, raw/<pid>/<take_id>.wav)`.
+
+**Step 2 — Per-keeper filter.** For each `(phoneme, wav_path)`:
+
+```
+ffmpeg -y -i <wav_path> \
+  -af "silenceremove=stop_periods=-1:stop_duration=0.05:stop_threshold=-50dB, \
+       loudnorm=I=<target_lufs>:TP=-1.5:LRA=11" \
+  -ar 22050 -ac 1 \
+  tmp/<bank-id>/<pid>.wav
+```
+
+`<target_lufs>` comes from `config.target_lufs` (default `-16`).
+
+**Step 3 — Build concat list.** For each filtered WAV, interleave a
+25 ms silent WAV (`ffmpeg -f lavfi -i anullsrc=r=22050:cl=mono -t 0.025`
+produced once and reused). Write an ffmpeg concat demuxer file:
+
+```
+file 'sh.wav'
+file 'silence.wav'
+file 'k.wav'
+file 'silence.wav'
+...
+```
+
+**Step 4 — Compute offsets.** Do **not** rely on post-hoc ffprobe of
+the concatenated output; instead probe each filtered WAV individually
+(ffprobe) and compute cumulative ms offsets in Python. This gives
+deterministic manifest offsets even if the MP3 encoder adds frame
+padding. Silent gaps count toward the next phoneme's offset.
+
+**Step 5 — Concat + encode to MP3.**
+
+```
+ffmpeg -y -f concat -safe 0 -i concat.txt \
+  -c:a libmp3lame -q:a 6 -ar 22050 -ac 1 \
+  dist/phonemes.mp3
+```
+
+**Step 6 — Emit manifest.**
+
+```json
+{
+  "ʃ":  { "start": 0,    "duration": 642, "loopable": true },
+  "k":  { "start": 667,  "duration": 90 },
+  "iː": { "start": 782,  "duration": 701, "loopable": true }
+}
+```
+
+Note: `loopable: false` is omitted from output to match BaseSkill's
+manifest style (spec §5's example has `loopable` absent for `k`).
+
+**Step 7 — Atomic write.** Write MP3 to `dist/phonemes.mp3.tmp` and
+manifest to `dist/phonemes.json.tmp`; `os.replace` both onto their
+final names. Either both land or neither does (implementation writes
+manifest first, MP3 second; on MP3 write failure, revert the
+manifest from backup). A simpler option: write both to a `dist.tmp/`
+sibling directory, then `os.replace` the directory. Choose whichever
+is simpler given ffmpeg's output target being a direct file.
+
+**Step 8 — Safety gate.** If `config.privacy == "private"`, call the
+M8 helper `verify_bank_gitignore(bank_path)` first. If it reports
+drift, auto-fix before writing. If auto-fix fails, return 409.
+
+**Step 9 — Cleanup.** On success, delete `tmp/<bank-id>/`. On
+failure, leave tmp intact and include the tmp path in the error
+response for debugging.
+
+### 13.4 Tests
+
+- `test_export_manifest_matches_golden` — fixture `en-test` bank,
+  mock `loudnorm` to a null filter (or disable normalisation via a
+  config override used only in tests) so the output is deterministic.
+  Manifest must equal `tests/fixtures/golden/phonemes.json` byte-for-byte.
+- `test_export_mp3_properties` — decoded MP3 has sample rate 22050,
+  channels 1, and total duration within the tolerance defined in
+  `phonemes-meta.json`.
+- `test_export_skips_missing_keepers_in_skip_mode` — en-test bank
+  with one phoneme missing its keeper, mode=skip, response lists it
+  in `skipped`, manifest omits the key, MP3 is shorter.
+- `test_export_fails_missing_keepers_in_fail_mode` — same setup
+  returns 400 `missing_keepers`, no files written.
+- `test_export_zero_keepers_returns_400` — empty state, 400
+  `zero_keepers`.
+- `test_export_never_opens_references_dir` — see §12.5. Patch
+  `builtins.open` with a read recorder, assert no path under
+  `references/` is read.
+- `test_export_intermediate_files_cleaned_up_on_success`.
+- `test_export_intermediate_files_preserved_on_failure` — force an
+  ffmpeg step to fail (rename binary temporarily or patch
+  `ffmpeg_util.run` to raise); assert `tmp/<bank-id>/` is still
+  present.
+- `test_export_loudnorm_override_not_in_production_code` —
+  meta-test: the config override used only for deterministic tests
+  must not leak into the production default.
+
+### 13.5 Acceptance
+
+- Dev bank has keepers for ≥ 5 phonemes. `POST /api/banks/en-au-leo/export`
+  returns 200 with a summary.
+- Copy `banks/en-au-leo/dist/phonemes.mp3` and `phonemes.json` into
+  `~/Sites/base-skill/public/audio/`. Open the BaseSkill
+  `WordLibraryExplorer` Storybook story. Playback of every included
+  phoneme works, loopable phonemes sustain, no console errors.
+- All export tests green.
