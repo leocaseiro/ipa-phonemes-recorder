@@ -1,5 +1,5 @@
 {
-  "_comment": "IPA → Kirshenbaum mapping for espeak-ng fallback. Used only when references/<phoneme_id>.ogg is not present. Expand as new phonemes are added to banks. Passed to espeak-ng as [[<value>]] phonetic input.",
+  "_comment": "Legacy IPA → Kirshenbaum (espeak) map — not used for HTTP reference preview; references use files only. Kept for possible tooling or future use.",
 
   "p":  "p",
   "b":  "b",
@@ -47,5 +47,8 @@
   "aʊ": "aU",
   "ɪə": "I@",
   "eə": "e@",
-  "ʊə": "U@"
+  "ʊə": "U@",
+  "ɛə": "E@",
+  "juː": "ju:",
+  "ks": "k s"
 }

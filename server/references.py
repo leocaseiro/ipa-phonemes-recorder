@@ -4,29 +4,42 @@
 """Reference-audio resolution.
 
 Order of attempts:
-  1. references/<phoneme_id>.ogg  — CC-BY-SA audio cached locally by
-     scripts/fetch_references.py
-  2. espeak-ng synthesis via the static IPA→Kirshenbaum map
+  1. server/seeds/phoneme_reference_files.json → a file in references/
+     (Vocabulary.com MP3s, see
+     https://www.vocabulary.com/resources/ipa-pronunciation/) — checked
+     first so it wins over any older Wikimedia ogg
+  2. references/<phoneme_id>.<ext> ogg, then mp3
+
+Reference preview uses only local files (Wikimedia and/or
+Vocabulary.com–sourced MP3s). There is no synthesis fallback.
+
+The `references/` directory is gitignored. It may contain audio
+whose licence does not permit redistribution; by design those files
+never leave the user's machine and are read-only from the export
+pipeline (spec §11.3).
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-ESPEAK_TIMEOUT_SECONDS = 10
+# Prefer .ogg when both exist (Wikimedia fetches from fetch_references.py use .ogg).
+LOCAL_REFERENCE_EXTENSIONS = (
+    ("ogg", "audio/ogg"),
+    ("mp3", "audio/mpeg"),
+)
 
 
 @dataclass
 class ReferenceResponse:
     body: bytes
     content_type: str
-    source: str  # "wikimedia" or "espeak"
+    source: str  # "wikimedia" | "vocabulary" | "file"
     attribution: str | None  # non-None iff source == "wikimedia"
 
 
@@ -38,84 +51,75 @@ class ReferenceError(Exception):
 
 
 def load_ipa_espeak_map(seeds_dir: Path) -> dict[str, str]:
-    """Return the IPA→Kirshenbaum map, or an empty dict if missing."""
+    """Return the IPA→Kirshenbaum map from seeds (optional; not used for reference preview)."""
     path = seeds_dir / "ipa_espeak_map.json"
     if not path.is_file():
         return {}
     raw = json.loads(path.read_text(encoding="utf-8"))
-    # Drop any keys starting with "_" (e.g. "_comment").
     return {k: v for k, v in raw.items() if isinstance(k, str) and not k.startswith("_")}
+
+
+def load_phoneme_reference_files(seeds_dir: Path) -> dict[str, str]:
+    """Return phoneme_id → filename in references/; empty if missing."""
+    path = seeds_dir / "phoneme_reference_files.json"
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        k: v
+        for k, v in raw.items()
+        if isinstance(k, str) and not k.startswith("_") and isinstance(v, str) and v
+    }
 
 
 def serve_reference(
     *,
     phoneme: dict,
     references_root: Path,
-    ipa_espeak_map: dict[str, str],
-    espeak_binary: Path | None,
+    phoneme_reference_files: dict[str, str],
     attribution_path: Path,
 ) -> ReferenceResponse:
     phoneme_id = phoneme.get("id", "")
 
-    ogg_path = references_root / f"{phoneme_id}.ogg"
-    if ogg_path.is_file():
-        return ReferenceResponse(
-            body=ogg_path.read_bytes(),
-            content_type="audio/ogg",
-            source="wikimedia",
-            attribution=read_attribution(attribution_path, phoneme_id),
-        )
+    alt = phoneme_reference_files.get(phoneme_id)
+    if alt:
+        path = references_root / alt
+        if path.is_file():
+            ext = path.suffix.lower().lstrip(".")
+            content_type = {
+                "mp3": "audio/mpeg",
+                "ogg": "audio/ogg",
+            }.get(ext, "application/octet-stream")
+            return ReferenceResponse(
+                body=path.read_bytes(),
+                content_type=content_type,
+                source="vocabulary",
+                attribution=None,
+            )
 
-    return _espeak_fallback(phoneme, ipa_espeak_map, espeak_binary)
+    for ext, content_type in LOCAL_REFERENCE_EXTENSIONS:
+        path = references_root / f"{phoneme_id}.{ext}"
+        if path.is_file():
+            wikimedia = ext == "ogg"
+            return ReferenceResponse(
+                body=path.read_bytes(),
+                content_type=content_type,
+                source="wikimedia" if wikimedia else "file",
+                attribution=(
+                    read_attribution(attribution_path, phoneme_id) if wikimedia else None
+                ),
+            )
 
-
-def _espeak_fallback(
-    phoneme: dict,
-    ipa_espeak_map: dict[str, str],
-    espeak_binary: Path | None,
-) -> ReferenceResponse:
     ipa = phoneme.get("ipa", "")
-    kirshenbaum = ipa_espeak_map.get(ipa)
-    if not kirshenbaum:
-        raise ReferenceError(
-            "espeak_no_mapping",
-            f"no espeak-ng mapping for IPA {ipa!r} — add an entry to server/seeds/ipa_espeak_map.json",
-        )
-    if espeak_binary is None:
-        raise ReferenceError(
-            "espeak_unavailable",
-            "espeak-ng not on PATH; install with: brew install espeak-ng",
-        )
-    try:
-        result = subprocess.run(
-            [
-                str(espeak_binary),
-                "-v", "en",
-                "-s", "120",
-                "--stdout",
-                f"[[{kirshenbaum}]]",
-            ],
-            capture_output=True,
-            timeout=ESPEAK_TIMEOUT_SECONDS,
-        )
-    except subprocess.TimeoutExpired as exc:
-        raise ReferenceError(
-            "espeak_failed",
-            f"espeak-ng timed out after {ESPEAK_TIMEOUT_SECONDS}s",
-        ) from exc
-
-    if result.returncode != 0:
-        stderr = result.stderr.decode("utf-8", errors="replace")[:300]
-        raise ReferenceError(
-            "espeak_failed",
-            f"espeak-ng exited {result.returncode}: {stderr}",
-        )
-
-    return ReferenceResponse(
-        body=result.stdout,
-        content_type="audio/wav",
-        source="espeak",
-        attribution=None,
+    raise ReferenceError(
+        "reference_missing",
+        (
+            f"no reference audio for phoneme_id {phoneme_id!r} (IPA {ipa!r}). "
+            f"Place a file under {references_root}/ or add a row to "
+            f"server/seeds/phoneme_reference_files.json. "
+            f"Clips from https://www.vocabulary.com/resources/ipa-pronunciation/ "
+            f"can be saved there (see seed map for filenames)."
+        ),
     )
 
 

@@ -27,7 +27,7 @@ from urllib.parse import urlparse
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
 from server.references import (
     ReferenceError,
-    load_ipa_espeak_map,
+    load_phoneme_reference_files,
     serve_reference,
 )
 from server.state import validate_state_shape, write_state
@@ -72,7 +72,7 @@ class ServerConfig:
     port: int
     ffmpeg: Path | None
     espeak: Path | None
-    ipa_espeak_map: dict[str, str]
+    phoneme_reference_files: dict[str, str]
 
 
 def probe_tools() -> tuple[Path | None, Path | None]:
@@ -457,8 +457,7 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             response = serve_reference(
                 phoneme=phoneme,
                 references_root=refs_root,
-                ipa_espeak_map=self.config.ipa_espeak_map,
-                espeak_binary=self.config.espeak,
+                phoneme_reference_files=self.config.phoneme_reference_files,
                 attribution_path=attribution_path,
             )
         except ReferenceError as exc:
@@ -574,27 +573,23 @@ def parse_args(argv: list[str] | None = None) -> ServerConfig:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args(argv)
     ffmpeg, espeak = probe_tools()
-    ipa_espeak_map = load_ipa_espeak_map(args.repo_root / "server" / "seeds")
+    seeds = args.repo_root / "server" / "seeds"
+    phoneme_reference_files = load_phoneme_reference_files(seeds)
     return ServerConfig(
         repo_root=args.repo_root,
         port=args.port,
         ffmpeg=ffmpeg,
         espeak=espeak,
-        ipa_espeak_map=ipa_espeak_map,
+        phoneme_reference_files=phoneme_reference_files,
     )
 
 
 def main(argv: list[str] | None = None) -> int:
     config = parse_args(argv)
-    missing = []
     if config.ffmpeg is None:
-        missing.append("ffmpeg")
-    if config.espeak is None:
-        missing.append("espeak-ng")
-    if missing:
         sys.stderr.write(
-            f"warning: missing tools on PATH: {', '.join(missing)}. "
-            "Install with: brew install ffmpeg espeak-ng\n"
+            "warning: ffmpeg not on PATH; recording/convert will fail. "
+            "Install with: brew install ffmpeg\n"
         )
 
     server = build_server(config)
