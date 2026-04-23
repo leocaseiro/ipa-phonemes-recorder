@@ -21,6 +21,9 @@ from dataclasses import dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
+
+from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
 
 VERSION = "0.1.0"
 DEFAULT_PORT = 8766
@@ -57,13 +60,25 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         return self.server.config  # type: ignore[attr-defined]
 
     def do_GET(self) -> None:  # noqa: N802 (stdlib naming)
+        path = urlparse(self.path).path
         try:
-            if self.path == "/api/health":
+            if path == "/api/health":
                 self._send_health()
-            elif self.path == "/":
+            elif path == "/api/banks":
+                self._list_banks()
+            elif path.startswith("/api/banks/"):
+                remainder = path.removeprefix("/api/banks/")
+                if remainder and "/" not in remainder:
+                    self._read_bank(remainder)
+                else:
+                    self._send_json(
+                        HTTPStatus.NOT_FOUND,
+                        {"error": "not_found", "message": f"No route for {self.path}"},
+                    )
+            elif path == "/":
                 self._serve_static("index.html")
-            elif self.path.startswith("/ui/"):
-                self._serve_static(self.path.removeprefix("/ui/"))
+            elif path.startswith("/ui/"):
+                self._serve_static(path.removeprefix("/ui/"))
             else:
                 self._send_json(
                     HTTPStatus.NOT_FOUND,
@@ -86,6 +101,33 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             "version": VERSION,
         }
         self._send_json(HTTPStatus.OK, payload)
+
+    def _list_banks(self) -> None:
+        self._send_json(
+            HTTPStatus.OK,
+            {"banks": list_banks(self.config.repo_root)},
+        )
+
+    def _read_bank(self, bank_id: str) -> None:
+        try:
+            bank = read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {
+                    "error": "bank_invalid",
+                    "message": f"bank {bank_id!r} has invalid config",
+                    "errors": exc.errors,
+                },
+            )
+            return
+        self._send_json(HTTPStatus.OK, bank)
 
     def _serve_static(self, rel: str) -> None:
         ext = Path(rel).suffix
