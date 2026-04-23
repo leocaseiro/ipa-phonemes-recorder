@@ -250,19 +250,69 @@ body {
 .bottom-zone {
   grid-area: bottom;
   display: flex;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 8px;
   padding: 16px 20px;
   background: var(--bg-raised);
   border-top: 1px solid var(--border);
 }
 
-.meter {
+.bottom-zone__row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.mic-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 180px;
+}
+
+.mic-grant-button {
+  padding: 8px 14px;
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mic-grant-button:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 15%, var(--bg-inset));
+  border-color: var(--accent);
+}
+
+.mic-grant-button:disabled {
+  color: var(--fg-muted);
+  cursor: not-allowed;
+}
+
+.mic-device {
+  font-size: 12px;
+  color: var(--fg-muted);
+  font-variant: small-caps;
+  letter-spacing: 0.04em;
+}
+
+.meter-canvas {
   flex: 1;
-  height: 24px;
+  height: 40px;
+  min-width: 0;
   background: var(--bg-inset);
   border-radius: 4px;
   border: 1px solid var(--border);
+  --waveform: var(--accent);
+}
+
+.mic-error-banner {
+  padding: 10px 14px;
+  background: color-mix(in oklab, var(--bad) 18%, transparent);
+  color: var(--bad);
+  border-radius: 6px;
+  font-size: 13px;
 }
 
 .record-button {

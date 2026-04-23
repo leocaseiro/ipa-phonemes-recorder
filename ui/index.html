@@ -37,10 +37,24 @@
     </section>
 
     <footer class="bottom-zone">
-      <div id="meter" class="meter" aria-label="Microphone level"></div>
-      <button id="record" class="record-button" type="button" disabled>
-        Record
-      </button>
+      <div class="bottom-zone__row">
+        <div class="mic-controls">
+          <button id="mic-grant" class="mic-grant-button" type="button">
+            Grant microphone
+          </button>
+          <span id="mic-device" class="mic-device" hidden></span>
+        </div>
+        <canvas
+          id="meter-canvas"
+          class="meter-canvas"
+          aria-label="Microphone level"
+          height="40"
+        ></canvas>
+        <button id="record" class="record-button" type="button" disabled>
+          Record
+        </button>
+      </div>
+      <div id="mic-error" class="mic-error-banner" role="alert" hidden></div>
     </footer>
 
     <script type="module" src="/ui/main.js"></script>

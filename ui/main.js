@@ -3,6 +3,7 @@
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
 import { getBank, getBanks, getHealth } from "/ui/api.js";
+import { requestMic, startMeter } from "/ui/audio.js";
 
 const banner = document.getElementById("health-banner");
 const recordButton = document.getElementById("record");
@@ -10,15 +11,26 @@ const bankSelect = document.getElementById("bank-select");
 const privacyBadge = document.getElementById("privacy-badge");
 const phonemeList = document.getElementById("phoneme-list");
 const phonemeDetail = document.getElementById("phoneme-detail");
+const micGrantButton = document.getElementById("mic-grant");
+const micDeviceLabel = document.getElementById("mic-device");
+const micErrorBanner = document.getElementById("mic-error");
+const meterCanvas = document.getElementById("meter-canvas");
+
+const METER_DB_FLOOR = -60;
+const METER_DECAY_DB_PER_SEC = 40;
+const METER_CLIP_THRESHOLD_DB = -1;
 
 let currentBank = null;
 let selectedPhonemeId = null;
+let meterPeakHoldDb = METER_DB_FLOOR;
+let meterLastTimestamp = null;
 
 async function init() {
   renderHealth(await safeGetHealth());
   await loadBanks();
   window.addEventListener("keydown", handleKeyDown);
   bankSelect.addEventListener("change", () => loadBank(bankSelect.value));
+  micGrantButton.addEventListener("click", grantMicAndStartMeter);
 }
 
 async function safeGetHealth() {
@@ -39,7 +51,6 @@ function renderHealth(body) {
   if (body?.error) {
     banner.classList.add("health-banner--missing");
     banner.textContent = `Health check failed: ${body.error}`;
-    recordButton.disabled = true;
     return;
   }
 
@@ -50,12 +61,13 @@ function renderHealth(body) {
   if (missing.length === 0) {
     banner.classList.add("health-banner--ready");
     banner.textContent = `Ready · v${body.version}`;
-    recordButton.disabled = false;
   } else {
     banner.classList.add("health-banner--missing");
     banner.textContent = `Missing: ${missing.join(", ")} — brew install ${missing.join(" ")}`;
-    recordButton.disabled = true;
   }
+  // Record button stays disabled until both mic is granted (M3)
+  // and the recording wiring lands (M4).
+  recordButton.disabled = true;
 }
 
 async function loadBanks() {
@@ -194,6 +206,79 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;",
   })[c]);
+}
+
+async function grantMicAndStartMeter() {
+  micGrantButton.disabled = true;
+  micGrantButton.textContent = "Waiting…";
+  micErrorBanner.hidden = true;
+  try {
+    const { device } = await requestMic();
+    micGrantButton.hidden = true;
+    micDeviceLabel.hidden = false;
+    micDeviceLabel.textContent = device;
+    sizeMeterCanvas();
+    window.addEventListener("resize", sizeMeterCanvas);
+    startMeter(paintMeter);
+  } catch (err) {
+    micGrantButton.disabled = false;
+    micGrantButton.textContent = "Grant microphone";
+    micErrorBanner.hidden = false;
+    micErrorBanner.textContent = micErrorMessage(err);
+  }
+}
+
+function micErrorMessage(err) {
+  if (err?.name === "NotAllowedError") {
+    return "Microphone permission denied. Re-enable under System Settings → Privacy & Security → Microphone, then reload.";
+  }
+  if (err?.name === "NotFoundError") {
+    return "No microphone detected. Connect one and reload.";
+  }
+  return `Microphone error: ${err?.message ?? err}`;
+}
+
+function sizeMeterCanvas() {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = meterCanvas.getBoundingClientRect();
+  if (rect.width === 0) return;
+  meterCanvas.width = Math.floor(rect.width * dpr);
+  meterCanvas.height = Math.floor(rect.height * dpr);
+}
+
+function paintMeter({ peakDb, rmsDb }) {
+  const now = performance.now();
+  const dt = meterLastTimestamp ? (now - meterLastTimestamp) / 1000 : 0;
+  meterLastTimestamp = now;
+  meterPeakHoldDb = Math.max(
+    peakDb,
+    meterPeakHoldDb - METER_DECAY_DB_PER_SEC * dt,
+  );
+  if (meterPeakHoldDb < METER_DB_FLOOR) meterPeakHoldDb = METER_DB_FLOOR;
+
+  const ctx = meterCanvas.getContext("2d");
+  const w = meterCanvas.width;
+  const h = meterCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const dbToX = (db) => ((db - METER_DB_FLOOR) / -METER_DB_FLOOR) * w;
+
+  const rmsX = Math.max(0, dbToX(rmsDb));
+  const gradient = ctx.createLinearGradient(0, 0, w, 0);
+  gradient.addColorStop(0, "#3fb37f");
+  gradient.addColorStop(0.75, "#d08a3a");
+  gradient.addColorStop(1, "#d64f4f");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, rmsX, h);
+
+  const peakX = dbToX(meterPeakHoldDb);
+  ctx.fillStyle = "#e6e8ec";
+  ctx.fillRect(Math.max(0, peakX - 1), 0, 2, h);
+
+  if (peakDb > METER_CLIP_THRESHOLD_DB) {
+    ctx.fillStyle = "#d64f4f";
+    ctx.fillRect(w - Math.max(4, Math.floor(w * 0.01)), 0, Math.max(4, Math.floor(w * 0.01)), h);
+  }
 }
 
 init();
