@@ -358,8 +358,8 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             )
         except ExportError as exc:
             status = HTTPStatus.BAD_REQUEST
-            if exc.code == "bad_request":
-                status = HTTPStatus.BAD_REQUEST
+            if exc.code == "gitignore_drift":
+                status = HTTPStatus.CONFLICT
             body = {"error": exc.code, "message": exc.message}
             if exc.detail:
                 body["detail"] = exc.detail

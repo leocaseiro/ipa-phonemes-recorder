@@ -27,6 +27,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from server.ffmpeg_util import FfmpegError, probe_duration_ms, run
+from server.gitignore import GitignoreSyncFailed, sync as sync_gitignore
 
 SILENCE_GAP_MS = 25
 TARGET_SAMPLE_RATE = 22050
@@ -116,6 +117,20 @@ def export_bank(
             json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
+
+        # Safety gate: a private bank must have dist/ gitignored before
+        # any bytes land there. Try to auto-sync first; if sync itself
+        # cannot write (read-only file, bad perms), abort the export.
+        if config.get("privacy") == "private":
+            try:
+                sync_gitignore(bank_path, "private")
+            except GitignoreSyncFailed as exc:
+                raise ExportError(
+                    "gitignore_drift",
+                    "refusing to write dist/ because the bank's .gitignore "
+                    "is not the expected 'dist/\\n' and could not be synced",
+                    detail=exc.message,
+                ) from exc
 
         dist_dir = bank_path / "dist"
         dist_dir.mkdir(exist_ok=True)

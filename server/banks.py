@@ -10,6 +10,9 @@ import logging
 import re
 from pathlib import Path
 
+from dataclasses import asdict
+
+from server.gitignore import verify as verify_gitignore
 from server.schema import validate_config
 from server.state import read_state
 
@@ -83,4 +86,9 @@ def read_bank(repo_root: Path, bank_id: str) -> dict:
         raise BankInvalid(bank_id, errors)
 
     state = read_state(bank_path)
-    return {"config": config, "state": state}
+    gitignore_status = verify_gitignore(bank_path, config["privacy"])
+    return {
+        "config": config,
+        "state": state,
+        "gitignore": asdict(gitignore_status),
+    }
