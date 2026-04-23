@@ -25,6 +25,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
+from server.references import (
+    ReferenceError,
+    load_ipa_espeak_map,
+    serve_reference,
+)
 from server.state import validate_state_shape, write_state
 from server.takes import (
     TakeNotFound,
@@ -57,6 +62,7 @@ MAX_STATE_BYTES = 10 * 1024 * 1024
 
 TAKE_POST_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes$")
 TAKE_FILE_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)$")
+REFERENCE_GET_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/reference$")
 STATE_PUT_RE = re.compile(r"^/api/banks/([^/]+)/state$")
 
 
@@ -66,6 +72,7 @@ class ServerConfig:
     port: int
     ffmpeg: Path | None
     espeak: Path | None
+    ipa_espeak_map: dict[str, str]
 
 
 def probe_tools() -> tuple[Path | None, Path | None]:
@@ -93,6 +100,9 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             elif (match := TAKE_FILE_RE.match(path)):
                 bank_id, phoneme_id, take_id = match.groups()
                 self._serve_take_wav(bank_id, phoneme_id, take_id)
+            elif (match := REFERENCE_GET_RE.match(path)):
+                bank_id, phoneme_id = match.groups()
+                self._serve_reference(bank_id, phoneme_id)
             elif path.startswith("/api/banks/"):
                 remainder = path.removeprefix("/api/banks/")
                 if remainder and "/" not in remainder:
@@ -410,6 +420,64 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         write_state(self.config.repo_root / "banks" / bank_id, new_state)
         self._send_json(HTTPStatus.OK, new_state)
 
+    def _serve_reference(self, bank_id: str, phoneme_id: str) -> None:
+        try:
+            bank = read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        phoneme = next(
+            (p for p in bank["config"]["phonemes"] if p.get("id") == phoneme_id),
+            None,
+        )
+        if phoneme is None:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "error": "not_found",
+                    "message": f"phoneme {phoneme_id!r} not in bank {bank_id!r}",
+                },
+            )
+            return
+
+        refs_root = self.config.repo_root / "references"
+        attribution_path = refs_root / "ATTRIBUTION.md"
+
+        try:
+            response = serve_reference(
+                phoneme=phoneme,
+                references_root=refs_root,
+                ipa_espeak_map=self.config.ipa_espeak_map,
+                espeak_binary=self.config.espeak,
+                attribution_path=attribution_path,
+            )
+        except ReferenceError as exc:
+            self._send_json(
+                HTTPStatus.BAD_GATEWAY,
+                {"error": exc.code, "message": exc.message},
+            )
+            return
+
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", response.content_type)
+        self.send_header("Content-Length", str(len(response.body)))
+        self.send_header("X-Reference-Source", response.source)
+        if response.attribution:
+            self.send_header("X-Reference-Attribution", response.attribution)
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(response.body)
+
     def _send_health(self) -> None:
         payload = {
             "ok": True,
@@ -506,11 +574,13 @@ def parse_args(argv: list[str] | None = None) -> ServerConfig:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parent.parent)
     args = parser.parse_args(argv)
     ffmpeg, espeak = probe_tools()
+    ipa_espeak_map = load_ipa_espeak_map(args.repo_root / "server" / "seeds")
     return ServerConfig(
         repo_root=args.repo_root,
         port=args.port,
         ffmpeg=ffmpeg,
         espeak=espeak,
+        ipa_espeak_map=ipa_espeak_map,
     )
 
 
