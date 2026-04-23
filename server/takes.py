@@ -44,6 +44,13 @@ class TakeSaveFailed(Exception):
         super().__init__(f"{code}: {message}")
 
 
+class TakeNotFound(Exception):
+    def __init__(self, phoneme_id: str, take_id: str):
+        self.phoneme_id = phoneme_id
+        self.take_id = take_id
+        super().__init__(f"take not found: {phoneme_id}/{take_id}")
+
+
 def next_take_id(phoneme_dir: Path, state: dict, phoneme_id: str) -> str:
     max_n = 0
     phoneme_state = state.get("phonemes", {}).get(phoneme_id, {})
@@ -159,3 +166,51 @@ def save_take(
         rms_db=rms_db,
         created_at=created_at,
     )
+
+
+def get_take_wav_path(bank_path: Path, phoneme_id: str, take_id: str) -> Path:
+    if not TAKE_ID_RE.match(take_id):
+        raise TakeNotFound(phoneme_id, take_id)
+    wav = bank_path / "raw" / phoneme_id / f"{take_id}.wav"
+    if not wav.is_file():
+        raise TakeNotFound(phoneme_id, take_id)
+    return wav
+
+
+def delete_take(*, bank_path: Path, phoneme_id: str, take_id: str) -> dict:
+    """Remove the take's WAV + state entry. Returns the updated state.
+
+    Siblings are not renumbered — take IDs are monotonic forever. If
+    the take was the keeper, clears keeper_take on that phoneme.
+    Raises TakeNotFound if neither the state entry nor the WAV exists.
+    """
+    if not TAKE_ID_RE.match(take_id):
+        raise TakeNotFound(phoneme_id, take_id)
+
+    state = read_state(bank_path)
+    phoneme = state.get("phonemes", {}).get(phoneme_id, {})
+    takes = phoneme.get("takes", []) if isinstance(phoneme, dict) else []
+    wav_path = bank_path / "raw" / phoneme_id / f"{take_id}.wav"
+
+    has_state_entry = any(
+        isinstance(t, dict) and t.get("id") == take_id for t in takes
+    )
+    has_disk = wav_path.is_file()
+    if not has_state_entry and not has_disk:
+        raise TakeNotFound(phoneme_id, take_id)
+
+    if isinstance(phoneme, dict):
+        phoneme["takes"] = [
+            t for t in takes if not (isinstance(t, dict) and t.get("id") == take_id)
+        ]
+        if phoneme.get("keeper_take") == take_id:
+            phoneme["keeper_take"] = None
+    write_state(bank_path, state)
+
+    if has_disk:
+        try:
+            wav_path.unlink()
+        except OSError as exc:
+            logger.warning("failed to remove %s: %s", wav_path, exc)
+
+    return state

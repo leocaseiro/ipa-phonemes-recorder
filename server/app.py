@@ -25,7 +25,14 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
-from server.takes import TakeSaveFailed, save_take
+from server.state import validate_state_shape, write_state
+from server.takes import (
+    TakeNotFound,
+    TakeSaveFailed,
+    delete_take,
+    get_take_wav_path,
+    save_take,
+)
 
 VERSION = "0.1.0"
 DEFAULT_PORT = 8766
@@ -46,8 +53,11 @@ UPLOAD_CONTENT_TYPES = {
 }
 
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_STATE_BYTES = 10 * 1024 * 1024
 
 TAKE_POST_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes$")
+TAKE_FILE_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)$")
+STATE_PUT_RE = re.compile(r"^/api/banks/([^/]+)/state$")
 
 
 @dataclass
@@ -80,6 +90,9 @@ class AppRequestHandler(BaseHTTPRequestHandler):
                 self._send_health()
             elif path == "/api/banks":
                 self._list_banks()
+            elif (match := TAKE_FILE_RE.match(path)):
+                bank_id, phoneme_id, take_id = match.groups()
+                self._serve_take_wav(bank_id, phoneme_id, take_id)
             elif path.startswith("/api/banks/"):
                 remainder = path.removeprefix("/api/banks/")
                 if remainder and "/" not in remainder:
@@ -97,6 +110,42 @@ class AppRequestHandler(BaseHTTPRequestHandler):
                 self._send_json(
                     HTTPStatus.NOT_FOUND,
                     {"error": "not_found", "message": f"No route for {self.path}"},
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            self.log_error("handler crashed: %s", exc)
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": "internal_error", "message": str(exc)},
+            )
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        try:
+            match = TAKE_FILE_RE.match(path)
+            if match:
+                self._delete_take(*match.groups())
+            else:
+                self._send_json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": "not_found", "message": f"No route for DELETE {self.path}"},
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            self.log_error("handler crashed: %s", exc)
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": "internal_error", "message": str(exc)},
+            )
+
+    def do_PUT(self) -> None:  # noqa: N802
+        path = urlparse(self.path).path
+        try:
+            match = STATE_PUT_RE.match(path)
+            if match:
+                self._put_state(match.group(1))
+            else:
+                self._send_json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": "not_found", "message": f"No route for PUT {self.path}"},
                 )
         except Exception as exc:  # pragma: no cover - defensive
             self.log_error("handler crashed: %s", exc)
@@ -232,6 +281,134 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(HTTPStatus.CREATED, asdict(meta))
+
+    def _serve_take_wav(self, bank_id: str, phoneme_id: str, take_id: str) -> None:
+        try:
+            read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+        try:
+            wav_path = get_take_wav_path(
+                self.config.repo_root / "banks" / bank_id, phoneme_id, take_id
+            )
+        except TakeNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "error": "not_found",
+                    "message": f"take {phoneme_id}/{take_id} not found",
+                },
+            )
+            return
+        body = wav_path.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", "audio/wav")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _delete_take(self, bank_id: str, phoneme_id: str, take_id: str) -> None:
+        try:
+            read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+        try:
+            delete_take(
+                bank_path=self.config.repo_root / "banks" / bank_id,
+                phoneme_id=phoneme_id,
+                take_id=take_id,
+            )
+        except TakeNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "error": "not_found",
+                    "message": f"take {phoneme_id}/{take_id} not found",
+                },
+            )
+            return
+        self.send_response(HTTPStatus.NO_CONTENT)
+        self.end_headers()
+
+    def _put_state(self, bank_id: str) -> None:
+        try:
+            read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        length_header = self.headers.get("Content-Length")
+        if not length_header:
+            self._send_json(
+                HTTPStatus.LENGTH_REQUIRED,
+                {"error": "length_required", "message": "Content-Length header is required"},
+            )
+            return
+        try:
+            length = int(length_header)
+        except ValueError:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "invalid Content-Length"},
+            )
+            return
+        if length > MAX_STATE_BYTES:
+            self._send_json(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                {"error": "payload_too_large", "message": f"state size {length} > {MAX_STATE_BYTES}"},
+            )
+            return
+
+        body = self.rfile.read(length)
+        try:
+            new_state = json.loads(body)
+        except json.JSONDecodeError as exc:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_json", "message": str(exc)},
+            )
+            return
+
+        errors = validate_state_shape(new_state)
+        if errors:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "state_invalid", "errors": errors},
+            )
+            return
+
+        write_state(self.config.repo_root / "banks" / bank_id, new_state)
+        self._send_json(HTTPStatus.OK, new_state)
 
     def _send_health(self) -> None:
         payload = {
