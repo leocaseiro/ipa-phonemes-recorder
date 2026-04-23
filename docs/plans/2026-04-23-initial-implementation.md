@@ -11,25 +11,25 @@ signatures, tests, and acceptance criteria. The app is small enough
 that one plan covers v1; any section that grows unexpectedly during
 implementation should be split into a dedicated sub-plan.
 
-## Table of contents
+## Sections
 
-1. [Overview](#1-overview)
-2. [Prerequisites](#2-prerequisites)
-3. [Target project structure](#3-target-project-structure)
-4. [Conventions](#4-conventions)
-5. [Testing strategy](#5-testing-strategy)
-6. [Phoneme inventory seed](#6-phoneme-inventory-seed)
-7. [Milestone 1 — Server skeleton + hello-world UI](#7-milestone-1--server-skeleton--hello-world-ui)
-8. [Milestone 2 — Bank listing + phoneme list render](#8-milestone-2--bank-listing--phoneme-list-render)
-9. [Milestone 3 — Microphone capture, meter, waveform](#9-milestone-3--microphone-capture-meter-waveform)
-10. [Milestone 4 — Take recording](#10-milestone-4--take-recording)
-11. [Milestone 5 — Take playback, keeper selection, delete](#11-milestone-5--take-playback-keeper-selection-delete)
-12. [Milestone 6 — Reference audio](#12-milestone-6--reference-audio)
-13. [Milestone 7 — Export pipeline](#13-milestone-7--export-pipeline)
-14. [Milestone 8 — Privacy flag + per-bank `.gitignore`](#14-milestone-8--privacy-flag--per-bank-gitignore)
-15. [Milestone 9 — New-bank flow + polish](#15-milestone-9--new-bank-flow--polish)
-16. [Risks & open questions](#16-risks--open-questions)
-17. [Completion tracker](#17-completion-tracker)
+1. Overview
+2. Prerequisites
+3. Target project structure
+4. Conventions
+5. Testing strategy
+6. Phoneme inventory seed
+7. Milestone 1 — Server skeleton + hello-world UI
+8. Milestone 2 — Bank listing + phoneme list render
+9. Milestone 3 — Microphone capture, meter, waveform
+10. Milestone 4 — Take recording
+11. Milestone 5 — Take playback, keeper selection, delete
+12. Milestone 6 — Reference audio
+13. Milestone 7 — Export pipeline
+14. Milestone 8 — Privacy flag + per-bank `.gitignore`
+15. Milestone 9 — New-bank flow + polish
+16. Risks & open questions
+17. Completion tracker
 
 ---
 
@@ -300,3 +300,231 @@ This makes it trivial to fork a bank for a second speaker with the
 same inventory. Implementation is a `config.json → config.json`
 phoneme-array copy with `privacy` reset to `"private"` and recordings
 excluded.
+
+---
+
+## 7. Milestone 1 — Server skeleton + hello-world UI
+
+**Goal:** `python3 -m server.app` starts an HTTP server on
+`localhost:8766`; Chrome loads `http://localhost:8766` and shows an
+empty four-zone layout with a health banner driven by
+`GET /api/health`.
+
+### 7.1 Files created
+
+| Path | Role |
+|---|---|
+| `server/__init__.py` | Package marker (empty). |
+| `server/app.py` | Entry point. Argparse (`--port`, `--repo-root`), tool probe, `ThreadingHTTPServer`, route table, static-file handler. |
+| `ui/index.html` | Four-zone skeleton: top bar, left panel, centre panel, bottom meter zone. Placeholders only. |
+| `ui/main.js` | ES-module entrypoint. Fetches `/api/health`, renders tool-status banner. |
+| `ui/styles.css` | CSS grid for the four zones, dark palette, basic typography. |
+| `tests/__init__.py` | Empty. |
+| `tests/test_app.py` | Health endpoint + static-file route tests. |
+| `.gitignore` (amend) | Add `tmp/` and `.DS_Store` if not already covered. |
+
+### 7.2 Server shape
+
+```python
+# server/app.py
+def build_server(config: ServerConfig) -> ThreadingHTTPServer: ...
+
+@dataclass
+class ServerConfig:
+    repo_root: Path
+    port: int
+    ffmpeg: Path | None
+    espeak: Path | None
+```
+
+Route table (starting set; later milestones append rows):
+
+| Method | Path | Handler | Milestone |
+|---|---|---|---|
+| GET | `/` | serve `ui/index.html` | M1 |
+| GET | `/ui/<path>` | serve `ui/` static files (whitelist extensions) | M1 |
+| GET | `/api/health` | `{"ok": true, "tools": {"ffmpeg": bool, "espeak_ng": bool}, "version": "0.1.0"}` | M1 |
+
+Static file handling restricts to `.html`, `.js`, `.css`, `.map`. No
+traversal: reject any path containing `..`.
+
+### 7.3 UI shape
+
+Four-zone CSS grid layout (per spec §10.1), placeholders only:
+
+- **Top bar**: title "IPA Phonemes Recorder" and a `<div id="health-banner">` that shows green "Ready" or red "ffmpeg missing / espeak-ng missing".
+- **Left panel**: empty `<ul id="phoneme-list">`.
+- **Centre panel**: empty `<section id="phoneme-detail">`.
+- **Bottom zone**: empty `<div id="meter">` and `<button id="record">` (disabled).
+
+`main.js` at M1 does one thing: fetch `/api/health`, flip the banner
+class, disable the record button if any tool missing.
+
+### 7.4 Tests (write alongside)
+
+- `test_health_ok_when_tools_present` — monkeypatch `shutil.which` to
+  return truthy, assert 200 + payload shape.
+- `test_health_flags_missing_ffmpeg` — monkeypatch `which('ffmpeg')`
+  to None, assert `tools.ffmpeg == false`.
+- `test_index_served_at_root` — GET `/`, assert 200 and
+  `Content-Type: text/html`.
+- `test_static_traversal_rejected` — GET `/ui/../../etc/passwd`,
+  assert 400 or 404 (not 200).
+
+### 7.5 Acceptance
+
+- `python3 -m server.app --port 8766` starts without error.
+- `curl http://localhost:8766/api/health` returns expected JSON.
+- Chrome loads `http://localhost:8766/`; four zones visible; health
+  banner reflects reality (try `PATH=/ python3 -m server.app` to
+  force missing tools).
+- `python3 -m unittest discover tests` passes.
+
+---
+
+## 8. Milestone 2 — Bank listing + phoneme list render
+
+**Goal:** With a seed bank present on disk, the UI shows the bank in
+the top-bar dropdown, renders its phoneme list in the left panel, and
+displays the privacy badge correctly. Selecting a phoneme shows its
+IPA glyph and example word in the centre panel. No recording yet.
+
+### 8.1 Files created
+
+| Path | Role |
+|---|---|
+| `server/schema.py` | `validate_config(config: dict) -> list[str]` returns list of errors (empty on success). `REQUIRED_FIELDS`, `PRIVACY_VALUES`, `PHONEME_FIELDS` as module constants. |
+| `server/banks.py` | `list_banks(repo_root) -> list[BankSummary]`; `read_bank(repo_root, bank_id) -> BankDetail`; raises `BankNotFound`, `BankInvalid`. |
+| `server/state.py` | `read_state(bank_path) -> dict` (empty dict if missing or corrupt — corrupt file gets renamed to `state.json.corrupt-<ts>` per spec §14); `write_state(bank_path, state)` via temp-plus-rename. |
+| `banks/en-au-leo/config.json` | Seed dev bank; `privacy: "private"`, ~10-phoneme subset for local dev. |
+| `banks/en-au-leo/.gitignore` | `dist/` (private bank). |
+| `banks/en-au-leo/raw/.gitkeep` | So the directory survives the gitignore. |
+| `tests/test_schema.py` | Schema validation unit tests. |
+| `tests/test_banks.py` | Bank discovery + read tests. |
+| `tests/test_state.py` | Atomic state I/O + corrupt-file recovery tests. |
+| `tests/fixtures/banks/en-test/config.json` | 3-phoneme fixture. |
+| `tests/fixtures/banks/en-test/state.json` | Empty (no takes yet). |
+
+### 8.2 Endpoints added
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/banks` | `{"banks": [{"id", "name", "locale", "privacy", "phoneme_count"}, ...]}` |
+| GET | `/api/banks/:id` | `{"config": {...}, "state": {...}}` — or `404` if bank missing, `422` if config invalid with the validator errors list |
+
+### 8.3 Schema rules (in `server/schema.py`)
+
+- Required: `name`, `locale`, `privacy`, `phonemes` (non-empty array).
+- `privacy ∈ {"public", "private"}`.
+- If `privacy == "public"`: `attribution` is required and non-empty.
+- Each phoneme: `id` (ASCII slug, `[a-z0-9_]+`), `ipa` (non-empty
+  string), `example` (string), `loopable` (boolean).
+- `target_lufs`: optional float, defaults to `-16`.
+- Duplicate `id` or duplicate `ipa` across the phonemes array →
+  error.
+
+### 8.4 UI additions
+
+- `ui/api.js` — thin fetch wrapper: `getBanks()`, `getBank(id)`.
+- `main.js` at startup: fetch bank list, populate `<select id="bank-select">`, pick the first (or last-selected via `localStorage`).
+- On bank change: fetch bank, render `<ul id="phoneme-list">` with each entry showing the IPA symbol, example word, and a placeholder `○` status glyph.
+- Clicking a phoneme (or `↑/↓`) updates `<section id="phoneme-detail">` with IPA glyph (large), example word, and a placeholder "No takes yet".
+- Privacy badge in the top bar: green "Public" or red "Private" with a lock icon.
+
+### 8.5 Tests
+
+- `test_schema.py`:
+  - `test_valid_public_bank_passes`
+  - `test_valid_private_bank_passes`
+  - `test_missing_attribution_rejected_for_public`
+  - `test_invalid_privacy_value_rejected`
+  - `test_duplicate_phoneme_id_rejected`
+  - `test_duplicate_ipa_rejected`
+  - `test_non_slug_phoneme_id_rejected`
+- `test_banks.py`:
+  - `test_list_banks_empty_returns_empty_list`
+  - `test_list_banks_skips_non_directories`
+  - `test_list_banks_skips_folder_without_config`
+  - `test_read_bank_returns_config_and_state`
+  - `test_read_bank_with_invalid_config_raises`
+- `test_state.py`:
+  - `test_read_state_missing_returns_empty`
+  - `test_read_state_corrupt_renames_and_returns_empty`
+  - `test_write_state_is_atomic` (write to a path, kill mid-write simulated via patching `os.replace` to raise, assert target unchanged)
+
+### 8.6 Acceptance
+
+- `/api/banks` returns `en-au-leo`.
+- `/api/banks/en-au-leo` returns the seed config + empty state.
+- UI shows the bank, the phoneme list, the IPA detail, and the red
+  "Private" badge.
+- All tests green.
+
+---
+
+## 9. Milestone 3 — Microphone capture, meter, waveform
+
+**Goal:** Granting mic permission activates a live VU meter in the
+bottom zone that moves with speech. Selecting a phoneme whose bank
+has takes (fixture-injected for this milestone's manual check) renders
+the take's waveform in the centre panel. No upload, no recording
+persistence yet.
+
+### 9.1 Scope
+
+Browser-only milestone. Zero server changes. All code in `ui/`.
+
+### 9.2 Files created / modified
+
+| Path | Change |
+|---|---|
+| `ui/audio.js` | Audio graph owner. Exports: `requestMic()`, `startMeter(onLevel)`, `stopMeter()`, `renderWaveform(canvas, arrayBuffer)`. Named exports only. |
+| `ui/main.js` | Wire mic grant UI, meter updates (rAF loop), placeholder waveform when a take WAV is hand-dropped into the fixture. |
+| `ui/styles.css` | Meter styles (vertical bar, peak hold), waveform canvas styles. |
+| `ui/index.html` | Add `<canvas id="meter-canvas">` and `<canvas id="waveform">`. |
+
+### 9.3 Audio graph
+
+```
+MediaStream (mic)
+  → MediaStreamSource
+  → AnalyserNode (fftSize=2048, smoothingTimeConstant=0.3)
+    → rAF loop reads time-domain data, computes peak + RMS, paints meter
+```
+
+Meter rendering runs at animation-frame rate; paint a simple vertical
+bar + a peak-hold tick that decays over ~1.5 s. Clipping (> -1 dBFS)
+paints a red cap.
+
+### 9.4 Waveform rendering
+
+Given an `ArrayBuffer` (WAV from the server, later milestones), decode
+via `AudioContext.decodeAudioData`, downsample the channel to
+canvas-width bins (min/max per bin), paint as a filled mini-waveform.
+No scrubbing / no playhead marker in v1 — just a static render.
+
+### 9.5 Mic permission UX
+
+- On first load, do **not** auto-prompt. The user clicks a "Grant mic"
+  button (appears in the bottom zone); this triggers
+  `navigator.mediaDevices.getUserMedia({ audio: true })`.
+- On deny: show the banner from spec §14 with macOS-specific copy
+  ("Re-enable under System Settings → Privacy & Security → Microphone").
+- On grant: meter starts immediately; button swaps to a device-name
+  label.
+
+### 9.6 Tests
+
+None automated (browser-only). Manual checks listed below.
+
+### 9.7 Acceptance (manual)
+
+- Click "Grant mic" → browser permission prompt → granted → meter
+  responds to room noise and speech.
+- Meter shows peak-hold tick and red clip cap when overdriven.
+- Drop a test WAV into `banks/en-au-leo/raw/sh/take-001.wav` by hand,
+  update `state.json` by hand to reference it, reload UI, select
+  `sh` → waveform renders. (This is a dev-loop test; Milestone 5
+  replaces it with a proper endpoint + UI list.)
+- Deny mic permission → banner with re-enable instructions appears,
+  record button stays disabled.
