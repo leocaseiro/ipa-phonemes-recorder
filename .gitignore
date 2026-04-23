@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+env/
+*.egg-info/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Per-bank working directories — always gitignored regardless of privacy flag.
+# `raw/` holds recorded takes (large WAVs, transient state).
+# `state.json` holds transient UI state (which take is selected, etc.).
+banks/*/raw/
+banks/*/state.json
+
+# Reference audio cache (CC-BY-SA assets fetched locally; not our copyright to redistribute).
+references/
+
+# Temporary files
+tmp/
+*.tmp
+
+# Secrets / env
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+
+# Private per-bank overrides
+# Each private bank also writes its own ./.gitignore containing `dist/` to keep output local.
