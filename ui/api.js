@@ -32,6 +32,30 @@ export async function getBank(id) {
   return fetchJson(`/api/banks/${encodeURIComponent(id)}`);
 }
 
+export async function getReference(bankId, phonemeId) {
+  const response = await fetch(
+    `/api/banks/${encodeURIComponent(bankId)}/phonemes/${encodeURIComponent(phonemeId)}/reference`,
+  );
+  if (!response.ok) {
+    let body = null;
+    try {
+      body = await response.json();
+    } catch {
+      // body stays null
+    }
+    const err = new Error(body?.message ?? `HTTP ${response.status}`);
+    err.status = response.status;
+    err.body = body;
+    throw err;
+  }
+  const buffer = await response.arrayBuffer();
+  return {
+    buffer,
+    source: response.headers.get("X-Reference-Source") ?? "unknown",
+    attribution: response.headers.get("X-Reference-Attribution"),
+  };
+}
+
 export async function getTakeWav(bankId, phonemeId, takeId) {
   const response = await fetch(
     `/api/banks/${encodeURIComponent(bankId)}/phonemes/${encodeURIComponent(phonemeId)}/takes/${encodeURIComponent(takeId)}`,

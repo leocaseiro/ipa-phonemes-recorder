@@ -7,6 +7,7 @@ import {
   getBank,
   getBanks,
   getHealth,
+  getReference,
   getTakeWav,
   postTake,
   putState,
@@ -233,7 +234,11 @@ function renderDetail(phoneme) {
     <div class="phoneme-detail__header">
       <span class="phoneme-detail__ipa">${escapeHtml(phoneme.ipa)}</span>
       <span class="phoneme-detail__example">${escapeHtml(phoneme.example ?? "")}</span>
+      <button class="reference-btn" data-action="play-reference" type="button" aria-label="Play reference audio (G)">
+        ▶ Reference <kbd>G</kbd>
+      </button>
     </div>
+    <p id="reference-attribution" class="reference-attribution" hidden></p>
     <dl class="phoneme-detail__meta">
       <dt>Id</dt><dd>${escapeHtml(phoneme.id)}</dd>
       <dt>Category</dt><dd>${escapeHtml(phoneme.category ?? "—")}</dd>
@@ -356,6 +361,52 @@ function handleKeyDown(event) {
     event.preventDefault();
     showDeleteConfirm(selectedTakeId);
     return;
+  }
+
+  if (event.key === "g" || event.key === "G") {
+    if (!selectedPhonemeId) return;
+    event.preventDefault();
+    playReference();
+    return;
+  }
+}
+
+async function playReference() {
+  if (!selectedPhonemeId) return;
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  const attributionEl = document.getElementById("reference-attribution");
+  if (attributionEl) attributionEl.hidden = true;
+
+  let payload;
+  try {
+    payload = await getReference(bankId, phonemeId);
+  } catch (err) {
+    const code = err.body?.error ?? "";
+    if (code === "espeak_no_mapping") {
+      showToast("No reference available for this phoneme", "error");
+    } else {
+      showToast(`Reference failed: ${err.message}`, "error");
+    }
+    return;
+  }
+
+  if (selectedPhonemeId !== phonemeId) return;
+
+  if (attributionEl && payload.source === "wikimedia" && payload.attribution) {
+    attributionEl.textContent = `Reference: ${payload.attribution}`;
+    attributionEl.hidden = false;
+  }
+
+  try {
+    await playBuffer(payload.buffer, {
+      onEnded: () => {
+        if (attributionEl) attributionEl.hidden = true;
+      },
+    });
+  } catch (err) {
+    if (attributionEl) attributionEl.hidden = true;
+    showToast(`Reference playback failed: ${err.message}`, "error");
   }
 }
 
@@ -491,13 +542,23 @@ function applyTakeLocally(phonemeId, take) {
 }
 
 function handleDetailClick(event) {
+  const actionEl = event.target.closest("[data-action]");
+  const action = actionEl?.dataset.action;
+
+  if (action === "play-reference") {
+    // Reference button lives in the phoneme header, not in a take row.
+    if (pendingDeleteTakeId) {
+      hideDeleteConfirm();
+      return;
+    }
+    playReference();
+    return;
+  }
+
   const row = event.target.closest(".takes-item");
   if (!row) return;
   const takeId = row.dataset.takeId;
   if (!takeId) return;
-
-  const actionEl = event.target.closest("[data-action]");
-  const action = actionEl?.dataset.action;
 
   // Delete-confirm modality: only its own buttons do anything; clicks
   // anywhere else just close the confirm.

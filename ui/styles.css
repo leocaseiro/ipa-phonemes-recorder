@@ -211,6 +211,48 @@ body {
   border-bottom: 1px solid var(--border);
 }
 
+.reference-btn {
+  margin-left: auto;
+  padding: 6px 12px;
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reference-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-inset));
+}
+
+.reference-btn kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.reference-attribution {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  background: var(--bg-inset);
+  border-left: 2px solid var(--accent);
+  border-radius: 3px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
 .phoneme-detail__ipa {
   font-size: 64px;
   font-weight: 500;
