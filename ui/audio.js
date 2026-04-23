@@ -11,6 +11,7 @@ const DB_FLOOR = -60;
 let audioContext = null;
 let micStream = null;
 let meterState = null;
+let playbackSource = null;
 
 function ensureContext() {
   if (!audioContext) {
@@ -95,6 +96,45 @@ export async function renderWaveform(canvas, arrayBuffer) {
   const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
   const data = audioBuffer.getChannelData(0);
   paintWaveform(canvas, data);
+}
+
+export async function playBuffer(arrayBuffer, { onEnded } = {}) {
+  const ctx = ensureContext();
+  if (ctx.state === "suspended") {
+    try {
+      await ctx.resume();
+    } catch {
+      // non-fatal
+    }
+  }
+  stopPlayback();
+  const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+  const source = ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(ctx.destination);
+  source.onended = () => {
+    if (playbackSource === source) {
+      playbackSource = null;
+      onEnded?.();
+    }
+  };
+  playbackSource = source;
+  source.start();
+  return source;
+}
+
+export function stopPlayback() {
+  if (!playbackSource) return;
+  try {
+    playbackSource.stop();
+  } catch {
+    // already stopped
+  }
+  playbackSource = null;
+}
+
+export function isPlaying() {
+  return playbackSource !== null;
 }
 
 function paintWaveform(canvas, data) {

@@ -2,8 +2,23 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-import { getBank, getBanks, getHealth, postTake } from "/ui/api.js";
-import { requestMic, startMeter } from "/ui/audio.js";
+import {
+  deleteTake,
+  getBank,
+  getBanks,
+  getHealth,
+  getTakeWav,
+  postTake,
+  putState,
+} from "/ui/api.js";
+import {
+  isPlaying,
+  playBuffer,
+  renderWaveform,
+  requestMic,
+  startMeter,
+  stopPlayback,
+} from "/ui/audio.js";
 import { isRecording, startRecording, stopRecording } from "/ui/record.js";
 
 const banner = document.getElementById("health-banner");
@@ -23,6 +38,9 @@ const METER_CLIP_THRESHOLD_DB = -1;
 
 let currentBank = null;
 let selectedPhonemeId = null;
+let selectedTakeId = null;
+let pendingDeleteTakeId = null;
+let playingTakeId = null;
 let meterPeakHoldDb = METER_DB_FLOOR;
 let meterLastTimestamp = null;
 let micStream = null;
@@ -38,6 +56,7 @@ async function init() {
   bankSelect.addEventListener("change", () => loadBank(bankSelect.value));
   micGrantButton.addEventListener("click", grantMicAndStartMeter);
   recordButton.addEventListener("click", toggleRecording);
+  phonemeDetail.addEventListener("click", handleDetailClick);
 }
 
 async function safeGetHealth() {
@@ -157,8 +176,13 @@ function statusGlyph(phonemeId, state) {
   return "●";
 }
 
-function selectPhoneme(id) {
+function selectPhoneme(id, { preferTakeId } = {}) {
+  if (playingTakeId) {
+    stopPlayback();
+    playingTakeId = null;
+  }
   selectedPhonemeId = id;
+  pendingDeleteTakeId = null;
   for (const item of phonemeList.querySelectorAll(".phoneme-item")) {
     item.classList.toggle(
       "phoneme-item--selected",
@@ -166,11 +190,39 @@ function selectPhoneme(id) {
     );
   }
   if (!id || !currentBank) {
+    selectedTakeId = null;
     renderEmpty("Select a phoneme to begin.");
     return;
   }
+  selectedTakeId = preferTakeId ?? defaultTakeForPhoneme(id);
   const phoneme = currentBank.config.phonemes.find((p) => p.id === id);
-  if (phoneme) renderDetail(phoneme);
+  if (phoneme) {
+    renderDetail(phoneme);
+    paintWaveformForSelectedTake();
+  }
+}
+
+function defaultTakeForPhoneme(phonemeId) {
+  const ph = currentBank?.state?.phonemes?.[phonemeId] ?? {};
+  if (ph.keeper_take) return ph.keeper_take;
+  const takes = ph.takes ?? [];
+  return takes.length > 0 ? takes[takes.length - 1].id : null;
+}
+
+function selectTake(takeId) {
+  if (playingTakeId) {
+    stopPlayback();
+    playingTakeId = null;
+  }
+  selectedTakeId = takeId;
+  pendingDeleteTakeId = null;
+  if (selectedPhonemeId) {
+    const phoneme = currentBank.config.phonemes.find((p) => p.id === selectedPhonemeId);
+    if (phoneme) {
+      renderDetail(phoneme);
+      paintWaveformForSelectedTake();
+    }
+  }
 }
 
 function renderDetail(phoneme) {
@@ -189,20 +241,45 @@ function renderDetail(phoneme) {
     </dl>
     <h2 class="takes-heading">Takes (${takes.length})</h2>
     ${takes.length === 0
-      ? '<p class="placeholder">No takes yet. Select this phoneme and press R (or click Record).</p>'
-      : `<ul class="takes-list">${takes.map((t) => renderTakeRow(t, keeperTakeId)).join("")}</ul>`}
+      ? '<p class="placeholder">No takes yet. Press R (or click Record) to record one.</p>'
+      : `<ul class="takes-list">${takes.map((t) => renderTakeRow(t, keeperTakeId)).join("")}</ul>
+         <canvas class="take-waveform" height="80" aria-label="Waveform of selected take"></canvas>`}
   `;
 }
 
 function renderTakeRow(take, keeperTakeId) {
+  if (pendingDeleteTakeId === take.id) {
+    return `
+      <li class="takes-item takes-item--pending-delete" data-take-id="${escapeHtml(take.id)}">
+        <span class="takes-item__confirm-message">Delete ${escapeHtml(take.id)}?</span>
+        <div class="takes-item__confirm-actions">
+          <button class="takes-btn" data-action="cancel-delete" type="button">Cancel</button>
+          <button class="takes-btn takes-btn--danger" data-action="confirm-delete" type="button">Delete</button>
+        </div>
+      </li>
+    `;
+  }
+
   const isKeeper = take.id === keeperTakeId;
+  const isSelected = take.id === selectedTakeId;
+  const isThisPlaying = take.id === playingTakeId;
+  const playGlyph = isThisPlaying ? "■" : "▶";
+  const classes = [
+    "takes-item",
+    isKeeper ? "takes-item--keeper" : "",
+    isSelected ? "takes-item--selected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
   return `
-    <li class="takes-item${isKeeper ? " takes-item--keeper" : ""}">
+    <li class="${classes}" data-take-id="${escapeHtml(take.id)}">
+      <button class="takes-btn takes-btn--play" data-action="play" type="button" aria-label="Play ${escapeHtml(take.id)}">${playGlyph}</button>
       <span class="takes-item__id">${escapeHtml(take.id)}</span>
       <span class="takes-item__duration">${take.duration_ms} ms</span>
       <span class="takes-item__peak">peak ${formatDb(take.peak_db)}</span>
       <span class="takes-item__rms">rms ${formatDb(take.rms_db)}</span>
-      ${isKeeper ? '<span class="takes-item__keeper">★ keeper</span>' : '<span></span>'}
+      <button class="takes-btn takes-btn--keeper ${isKeeper ? "takes-btn--keeper-on" : ""}" data-action="keeper" type="button" aria-pressed="${isKeeper}">${isKeeper ? "★ Keeper" : "☆ Keeper"}</button>
+      <button class="takes-btn takes-btn--delete" data-action="delete" type="button" aria-label="Delete ${escapeHtml(take.id)}">🗑</button>
     </li>
   `;
 }
@@ -220,6 +297,19 @@ function renderEmpty(message) {
 function handleKeyDown(event) {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  if (
+    tag === "BUTTON" &&
+    (event.key === "Enter" || event.key === " " || event.key === "Backspace")
+  ) {
+    // Let the focused button handle these keys natively.
+    return;
+  }
+
+  if (event.key === "Escape" && pendingDeleteTakeId) {
+    event.preventDefault();
+    hideDeleteConfirm();
+    return;
+  }
 
   if (event.key === "ArrowUp" || event.key === "ArrowDown") {
     if (!currentBank?.config.phonemes?.length) return;
@@ -236,6 +326,27 @@ function handleKeyDown(event) {
     if (!micStream) return;
     event.preventDefault();
     toggleRecording();
+    return;
+  }
+
+  if (event.key === " ") {
+    if (!selectedTakeId) return;
+    event.preventDefault();
+    togglePlay(selectedTakeId);
+    return;
+  }
+
+  if (event.key === "Enter") {
+    if (!selectedTakeId) return;
+    event.preventDefault();
+    toggleKeeper(selectedTakeId);
+    return;
+  }
+
+  if (event.key === "Backspace") {
+    if (!selectedTakeId) return;
+    event.preventDefault();
+    showDeleteConfirm(selectedTakeId);
     return;
   }
 }
@@ -361,7 +472,180 @@ function applyTakeLocally(phonemeId, take) {
   });
   currentBank.state.last_phoneme_id = phonemeId;
   renderPhonemeList(currentBank);
-  selectPhoneme(phonemeId);
+  selectPhoneme(phonemeId, { preferTakeId: take.take_id });
+}
+
+function handleDetailClick(event) {
+  const row = event.target.closest(".takes-item");
+  if (!row) return;
+  const takeId = row.dataset.takeId;
+  if (!takeId) return;
+
+  const actionEl = event.target.closest("[data-action]");
+  const action = actionEl?.dataset.action;
+
+  if (action === "play") {
+    togglePlay(takeId);
+    return;
+  }
+  if (action === "keeper") {
+    toggleKeeper(takeId);
+    return;
+  }
+  if (action === "delete") {
+    showDeleteConfirm(takeId);
+    return;
+  }
+  if (action === "confirm-delete") {
+    doDelete(takeId);
+    return;
+  }
+  if (action === "cancel-delete") {
+    hideDeleteConfirm();
+    return;
+  }
+  // Row body click → select the take.
+  selectTake(takeId);
+}
+
+async function togglePlay(takeId) {
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  if (!phonemeId) return;
+  if (playingTakeId === takeId) {
+    stopPlayback();
+    playingTakeId = null;
+    refreshDetailOnly();
+    return;
+  }
+  try {
+    const buffer = await getTakeWav(bankId, phonemeId, takeId);
+    // Race: if another take was selected/playback request landed first, abort.
+    if (selectedPhonemeId !== phonemeId) return;
+    await playBuffer(buffer, {
+      onEnded: () => {
+        if (playingTakeId === takeId) {
+          playingTakeId = null;
+          refreshDetailOnly();
+        }
+      },
+    });
+    playingTakeId = takeId;
+    selectedTakeId = takeId;
+    refreshDetailOnly();
+  } catch (err) {
+    showToast(`Playback failed: ${err.message}`, "error");
+  }
+}
+
+async function toggleKeeper(takeId) {
+  if (!currentBank || !selectedPhonemeId) return;
+  const phonemeState = currentBank.state.phonemes?.[selectedPhonemeId];
+  if (!phonemeState) return;
+
+  const previousKeeper = phonemeState.keeper_take ?? null;
+  const nextKeeper = previousKeeper === takeId ? null : takeId;
+
+  phonemeState.keeper_take = nextKeeper;
+  selectedTakeId = takeId;
+  renderPhonemeList(currentBank);
+  refreshDetailOnly();
+
+  try {
+    await putState(bankSelect.value, currentBank.state);
+  } catch (err) {
+    phonemeState.keeper_take = previousKeeper;
+    renderPhonemeList(currentBank);
+    refreshDetailOnly();
+    showToast(`Keeper save failed: ${err.message}`, "error");
+  }
+}
+
+function showDeleteConfirm(takeId) {
+  pendingDeleteTakeId = takeId;
+  refreshDetailOnly();
+}
+
+function hideDeleteConfirm() {
+  pendingDeleteTakeId = null;
+  refreshDetailOnly();
+}
+
+async function doDelete(takeId) {
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  const phonemeState = currentBank?.state?.phonemes?.[phonemeId];
+  if (!phonemeState) return;
+
+  // Snapshot for rollback.
+  const previousTakes = phonemeState.takes.slice();
+  const previousKeeper = phonemeState.keeper_take ?? null;
+
+  // Optimistic remove.
+  phonemeState.takes = previousTakes.filter((t) => t.id !== takeId);
+  if (phonemeState.keeper_take === takeId) phonemeState.keeper_take = null;
+  pendingDeleteTakeId = null;
+  if (selectedTakeId === takeId) {
+    selectedTakeId = defaultTakeForPhoneme(phonemeId);
+  }
+  if (playingTakeId === takeId) {
+    stopPlayback();
+    playingTakeId = null;
+  }
+  renderPhonemeList(currentBank);
+  refreshDetailOnly();
+
+  try {
+    await deleteTake(bankId, phonemeId, takeId);
+    showToast(`Deleted ${takeId}`, "success");
+    if (selectedTakeId) paintWaveformForSelectedTake();
+  } catch (err) {
+    phonemeState.takes = previousTakes;
+    phonemeState.keeper_take = previousKeeper;
+    renderPhonemeList(currentBank);
+    refreshDetailOnly();
+    showToast(`Delete failed: ${err.message}`, "error");
+  }
+}
+
+function refreshDetailOnly() {
+  if (!selectedPhonemeId || !currentBank) return;
+  const phoneme = currentBank.config.phonemes.find((p) => p.id === selectedPhonemeId);
+  if (phoneme) {
+    renderDetail(phoneme);
+    paintWaveformForSelectedTake();
+  }
+}
+
+async function paintWaveformForSelectedTake() {
+  if (!selectedTakeId || !selectedPhonemeId) return;
+  const canvas = phonemeDetail.querySelector(".take-waveform");
+  if (!canvas) return;
+  sizeCanvasToDisplay(canvas);
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  const takeId = selectedTakeId;
+  let buffer;
+  try {
+    buffer = await getTakeWav(bankId, phonemeId, takeId);
+  } catch {
+    return;
+  }
+  // Race: selection may have moved while fetching.
+  if (selectedPhonemeId !== phonemeId || selectedTakeId !== takeId) return;
+  try {
+    await renderWaveform(canvas, buffer);
+  } catch {
+    // decodeAudioData can throw on odd inputs; silent.
+  }
+}
+
+function sizeCanvasToDisplay(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  if (rect.width === 0) return;
+  canvas.width = Math.floor(rect.width * dpr);
+  canvas.height = Math.floor(rect.height * dpr);
 }
 
 function updateRecordButton() {

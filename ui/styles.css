@@ -370,19 +370,32 @@ body {
 
 .takes-item {
   display: grid;
-  grid-template-columns: 80px 80px 120px 120px 1fr;
+  grid-template-columns: 32px 80px 80px 110px 110px auto 32px;
   align-items: center;
-  gap: 16px;
-  padding: 10px 14px;
+  gap: 12px;
+  padding: 8px 12px;
   background: var(--bg-raised);
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 13px;
+  cursor: pointer;
+}
+
+.takes-item:hover {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--border));
+}
+
+.takes-item--selected {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 12%, var(--bg-raised));
 }
 
 .takes-item--keeper {
-  border-color: var(--good);
-  background: color-mix(in oklab, var(--good) 10%, var(--bg-raised));
+  border-left: 3px solid var(--good);
+}
+
+.takes-item--selected.takes-item--keeper {
+  border-left-color: var(--good);
 }
 
 .takes-item__id {
@@ -397,10 +410,81 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-.takes-item__keeper {
-  color: var(--good);
-  font-weight: 600;
+.takes-btn {
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
   font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.takes-btn:hover {
+  border-color: var(--accent);
+}
+
+.takes-btn--play {
+  font-size: 11px;
+  padding: 4px 8px;
+  min-width: 30px;
+}
+
+.takes-btn--keeper {
+  min-width: 90px;
+}
+
+.takes-btn--keeper-on {
+  background: color-mix(in oklab, var(--good) 24%, var(--bg-inset));
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.takes-btn--delete {
+  min-width: 30px;
+  padding: 4px 6px;
+}
+
+.takes-btn--delete:hover {
+  border-color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 14%, var(--bg-inset));
+}
+
+.takes-btn--danger {
+  background: var(--bad);
+  color: white;
+  border-color: var(--bad);
+}
+
+.takes-item--pending-delete {
+  grid-template-columns: 1fr auto;
+  gap: 16px;
+  border-color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 10%, var(--bg-raised));
+  cursor: default;
+}
+
+.takes-item__confirm-message {
+  color: var(--fg);
+  font-weight: 500;
+}
+
+.takes-item__confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.take-waveform {
+  display: block;
+  width: 100%;
+  max-width: 600px;
+  height: 80px;
+  margin-top: 16px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  --waveform: var(--accent);
 }
 
 .toast {
