@@ -1058,3 +1058,328 @@ response for debugging.
   `WordLibraryExplorer` Storybook story. Playback of every included
   phoneme works, loopable phonemes sustain, no console errors.
 - All export tests green.
+
+---
+
+## 14. Milestone 8 — Privacy flag + per-bank `.gitignore`
+
+**Goal:** The per-bank `.gitignore` is the tool's responsibility and
+matches the bank's `privacy` field at all times. Flipping a bank from
+private to public requires explicit, friction-ful confirmation that
+documents informed consent. The pipeline refuses to export a private
+bank whose `.gitignore` is drifted.
+
+### 14.1 Files created / modified
+
+| Path | Change |
+| --- | --- |
+| `server/gitignore.py` | `expected_content(privacy) -> str`; `verify(bank_path, privacy) -> GitignoreStatus`; `sync(bank_path, privacy) -> GitignoreStatus`. Atomic write via temp-plus-rename. |
+| `server/banks.py` | On read, call `verify(...)` and include a `gitignore` field in the detail response: `{"status": "ok" \| "drifted" \| "missing", "expected": str, "current": str}`. |
+| `server/export.py` | At step 8, call `sync(...)` when privacy=private and the status is not "ok". Raise `GitignoreSyncFailed` (→ 409) if the sync itself fails. |
+| `server/app.py` | Add `PUT /api/banks/:id/config` (limited: only `privacy` and `attribution` mutable). |
+| `ui/privacy.js` | Badge click handler, confirm modal, attribution textbox. |
+| `ui/main.js` | Mount privacy.js; on bank load, render drift warning if present. |
+| `ui/styles.css` | Modal styling, drift-warning banner (yellow). |
+| `tests/test_gitignore.py` | Sync, drift detection, atomic write, expected content. |
+
+### 14.2 `.gitignore` content rules
+
+| Bank privacy | Per-bank `.gitignore` |
+| --- | --- |
+| `private` | Exactly `dist/\n`. No other lines. |
+| `public` | File absent, or empty. |
+
+Why so strict? The root `.gitignore` already covers `raw/` and
+`state.json`. The per-bank file's only job is `dist/`, and keeping it
+minimal makes drift detection an equality check, not a grammar
+parse. If a user adds custom lines, the tool treats the file as
+drifted and surfaces a yellow banner with both the expected and
+current contents — it does not overwrite custom additions without
+the user clicking "Sync".
+
+### 14.3 Config PUT endpoint
+
+```
+PUT /api/banks/:id/config
+Content-Type: application/json
+{
+  "privacy": "public",
+  "attribution": "Leo Caseiro, CC BY 4.0",
+  "confirm_flip": true              // required if privacy changes
+}
+
+200 OK
+{ "config": <full updated config>, "gitignore": {"status": "ok", ...} }
+```
+
+Errors:
+
+- `400 confirm_required` if `privacy` changes and `confirm_flip`
+  isn't `true`.
+- `422 attribution_required` if resulting privacy is `public` and
+  attribution is empty.
+- `422 invalid_privacy`.
+
+The PUT only accepts `privacy` and `attribution`. All other config
+fields (phoneme inventory, target_lufs) are edited by hand in
+`config.json`. This is a deliberate limitation — wholesale config
+editing in the UI is out of scope for v1.
+
+### 14.4 UI flow
+
+- The privacy badge in the top bar is clickable.
+- Private → public flip: modal with spec §13.3 copy verbatim,
+  attribution textbox (pre-filled from config if any), and a two-
+  step confirm button ("I confirm informed consent from the speaker
+  and, where applicable, their guardian → Flip to public"). The
+  button is disabled until the textbox has non-whitespace content.
+  Second click fires the PUT.
+- Public → private flip: single-step confirm ("Make this bank
+  private? Future exports won't be committed.") — less friction
+  since we're moving toward more safety, not away.
+- After a successful flip, the badge flips colour, a toast confirms
+  "Privacy set to `<value>`, .gitignore synced."
+- Drift banner: yellow banner with expected / current diff and a
+  "Sync" button. Clicking "Sync" calls the PUT with the same privacy
+  (no-op flip) to trigger a re-sync, or a dedicated endpoint if we
+  add one.
+
+### 14.5 Tests
+
+- `test_gitignore.py`:
+  - `test_expected_private_is_dist_slash`
+  - `test_expected_public_is_empty`
+  - `test_verify_ok_when_private_and_file_matches`
+  - `test_verify_missing_when_private_and_file_absent`
+  - `test_verify_drifted_when_file_has_extra_lines`
+  - `test_verify_ok_when_public_and_file_absent`
+  - `test_verify_ok_when_public_and_file_empty`
+  - `test_verify_drifted_when_public_and_file_has_content`
+  - `test_sync_writes_expected_content_atomically`
+  - `test_sync_noop_when_already_ok`
+- `test_app.py` (endpoint tests):
+  - `test_put_config_flip_requires_confirm`
+  - `test_put_config_flip_requires_attribution_when_going_public`
+  - `test_put_config_rewrites_gitignore_after_flip`
+  - `test_put_config_rejects_unknown_fields`
+- `test_export.py`:
+  - `test_export_auto_syncs_gitignore_when_drifted_and_private`
+  - `test_export_returns_409_when_gitignore_sync_fails`
+
+### 14.6 Acceptance
+
+- On a private bank with `dist/` in its `.gitignore`, `/api/banks/:id`
+  reports `gitignore.status = "ok"` and no banner appears.
+- Manually edit `banks/en-au-leo/.gitignore` to remove `dist/`,
+  reload UI → yellow banner with expected vs current → click Sync →
+  banner clears and `.gitignore` contains `dist/\n` again.
+- Flip badge to public without typing an attribution → textbox is
+  required; no request fires.
+- Flip completes → badge green, tooltip shows attribution, per-bank
+  `.gitignore` is now empty (not missing; empty-file is fine per
+  §14.2).
+- Run export on a private bank whose `.gitignore` is hand-deleted;
+  export auto-syncs and succeeds. Delete `.gitignore` and make it
+  read-only (`chmod 444`); export returns 409 `gitignore_drift` and
+  no `dist/` bytes are written.
+- All new tests green.
+
+---
+
+## 15. Milestone 9 — New-bank flow + polish
+
+**Goal:** The user can create a new bank from the UI without editing
+filesystem files by hand. Every bank starts private. The UI is
+keyboard-navigable end-to-end, autosaves silently with status toasts,
+and surfaces server errors without losing user state.
+
+### 15.1 Files created / modified
+
+| Path | Change |
+| --- | --- |
+| `server/app.py` | Add `POST /api/banks` endpoint. |
+| `server/banks.py` | `create_bank(repo_root, payload) -> BankSummary`. Validates id uniqueness and slug shape; writes folder skeleton, config.json, empty state.json, per-bank .gitignore. |
+| `ui/new-bank.js` | Modal form, inventory-source dropdown (`english-basic` / `copy:<existing-bank-id>`). |
+| `ui/shortcuts.js` | Central keyboard dispatcher. Each milestone's shortcuts register here; this module owns the global listener and delegates to handlers. |
+| `ui/toasts.js` | Minimal toast queue (success / error / info). |
+| `ui/main.js` | Wire new-bank button, shortcut dispatcher, toast host. |
+| `ui/styles.css` | Modal + toast styles. Keyboard focus rings. |
+| `tests/test_banks.py` | New-bank creation tests. |
+
+### 15.2 Endpoint
+
+```
+POST /api/banks
+Content-Type: application/json
+{
+  "id": "en-us-sam",
+  "name": "General American — Sam",
+  "locale": "en-US",
+  "speaker": "Sam Doe",
+  "inventory_source": "english-basic" | "copy:<existing-bank-id>"
+}
+
+201 Created
+{ "bank": <BankSummary>, "path": "banks/en-us-sam" }
+```
+
+Errors:
+
+- `409 bank_id_exists` if the folder already exists.
+- `422 invalid_id` if the id isn't `[a-z0-9-]+`.
+- `422 invalid_locale` if locale isn't `xx` or `xx-XX` shape.
+- `422 unknown_inventory_source` if the source id can't be resolved.
+
+The new bank is always created with `privacy: "private"` and no
+`attribution`. Flipping to public happens through M8's PUT endpoint.
+
+### 15.3 UI flow
+
+- "New bank" button in top bar opens a modal with:
+  - Bank id (slug, auto-suggested from locale+speaker)
+  - Display name
+  - Locale (dropdown of common values + free-text fallback)
+  - Speaker name
+  - Inventory source: `english-basic` or any existing bank
+  - A small note: "Default privacy: **private**. Voice is biometric
+    data; CC-BY-4.0 is effectively irrevocable once published. For
+    minor speakers, keep private unless you have long-term informed
+    consent from the guardian."
+- On submit: POST → on 201, bank appears in the dropdown and is
+  selected automatically. Toast: "Created en-us-sam (private)."
+
+### 15.4 Polish checklist
+
+- **Keyboard shortcuts** — full list from spec §10.2 dispatched via
+  `ui/shortcuts.js`. Each handler no-ops if the focus is inside a
+  text input (so typing attribution doesn't trigger `R`).
+- **Autosave toasts** — brief "Saved" flash on every successful PUT
+  state; replace with red "Save failed — retry?" on error, leaving
+  the UI in its pre-PUT state so the user can retry.
+- **Health banner** — from M1, refined: on tool-missing it now
+  includes a one-line install hint (`brew install ffmpeg espeak-ng`).
+- **Last input device label** — persisted in state (spec §6.4);
+  shown next to the mic-grant button after the first grant.
+- **Optimistic UI with rollback** — every mutation updates the UI
+  immediately, fires the PUT, and rolls back on failure. This
+  applies to keeper change, delete, notes edit.
+- **Error surface** — any unexpected 5xx from the server shows a
+  modal with the `error.message` and a "Copy details" button (to
+  make issue reporting easier).
+- **No auto-focus traps** — every modal closes on `Esc` and focuses
+  the element that opened it on close.
+
+### 15.5 Tests
+
+- `test_banks.py` additions:
+  - `test_create_bank_writes_skeleton`
+  - `test_create_bank_defaults_to_private`
+  - `test_create_bank_writes_per_bank_gitignore`
+  - `test_create_bank_rejects_duplicate_id`
+  - `test_create_bank_rejects_invalid_slug`
+  - `test_create_bank_copies_phoneme_inventory_from_source`
+  - `test_create_bank_with_english_basic_seed`
+  - `test_create_bank_ignores_speaker_recordings_when_copying`
+
+### 15.6 Acceptance
+
+- Create a new bank `en-us-sam` using the English-basic inventory →
+  folder appears with config, empty state, private `.gitignore`.
+  Bank is selected in the UI with the full phoneme list and red
+  "Private" badge.
+- Create a second bank that copies `en-au-leo`'s inventory → new
+  bank's phoneme array matches the source, but no recordings are
+  copied.
+- Every spec §10.2 shortcut works when the phoneme list or takes
+  list has focus, and is correctly suppressed when a text field has
+  focus.
+- Pull the network cable (or `sudo ifconfig en0 down`) mid-autosave
+  → red toast, UI state unchanged, retry works once connectivity
+  returns. (Since this is localhost, the equivalent is stopping the
+  server mid-flight.)
+- All v1 tests green on `python3 -m unittest discover tests`.
+- Manual end-to-end pass: record a 5-phoneme bank, export, drop into
+  BaseSkill, verify in `WordLibraryExplorer`. **This is the v1
+  completion gate.**
+
+---
+
+## 16. Risks & open questions
+
+### 16.1 Known risks
+
+- **ffmpeg `loudnorm` nondeterminism.** `loudnorm` uses a two-pass
+  algorithm whose output can drift by a few samples between versions
+  or even between runs. Mitigation: the export test disables
+  `loudnorm` via a test-only config path and compares the manifest
+  byte-for-byte; MP3 duration checks use tolerances.
+- **MediaRecorder codec portability.** Chrome produces WebM/Opus by
+  default; Safari may produce MP4/AAC. The server's ffmpeg call
+  accepts both (`-i` auto-detects) but we should log the actual
+  `Content-Type` received and verify on both browsers during M4
+  acceptance.
+- **Subprocess output size.** Ffmpeg stderr for a single take is
+  small, but a full export pipes many stderrs through. Capture via
+  `subprocess.run(..., capture_output=True)` with a size cap; if
+  exceeded, log to disk and truncate the in-memory copy.
+- **State.json growth.** After hundreds of takes, `state.json` can
+  become a few hundred kB. Not a v1 concern, but avoid any operation
+  that re-serialises state on every keystroke (notes field should
+  PUT on blur, not on each character).
+- **Race between two browser tabs.** Spec §14 says "last write
+  wins". Ensure PUT state is atomic (already guaranteed by
+  temp-plus-rename) so a race produces one valid state, never a
+  merged mutant.
+
+### 16.2 Open questions (resolve during implementation)
+
+- **IPA → Kirshenbaum map completeness.** The static map at
+  `server/seeds/ipa_espeak_map.json` needs coverage for the full
+  english-basic seed. Populating it is a per-phoneme lookup
+  exercise; if a phoneme has no plausible espeak rendering, the
+  fallback returns 502 and the UI shows a friendly "no reference
+  available" message. Track gaps by running the seed against the
+  fallback and logging all `espeak_no_mapping` responses.
+- **Port-in-use behaviour.** Detect `EADDRINUSE` on startup and
+  either (a) fail with a clear message pointing to `--port`, or
+  (b) probe 8766…8775. Prefer (a) for predictability.
+- **Wikimedia URL drift.** Commons occasionally moves or re-licenses
+  files. The fetch script logs 404s; re-running periodically with
+  updates to the constant table is manual housekeeping.
+- **Dist directory atomicity.** §13.3 step 7 proposes two options
+  (tmp-pair-replace vs tmp-directory-replace). Pick during M7
+  implementation — the simpler one wins.
+- **Storybook story name for v1 gate.** Confirm the exact story is
+  still `WordLibraryExplorer` in BaseSkill; the current
+  implementation in `~/Sites/base-skill` is the source of truth.
+
+### 16.3 Things deferred out of scope (spec §17 restated)
+
+- Diphones / whole-word synthesis.
+- Short / long variant tracks per phoneme.
+- In-browser waveform editing.
+- Multi-bank UI swap in BaseSkill (requires consumer-side change).
+- Import / export banks as zip files.
+- Automated pre-push symlink into BaseSkill.
+
+---
+
+## 17. Completion tracker
+
+Tick each milestone only when its acceptance criteria are met and its
+tests are green.
+
+- [ ] **M1** — Server skeleton + hello-world UI (`/api/health`, four-zone layout)
+- [ ] **M2** — Bank listing + phoneme list render (seed `en-au-leo`, schema validation)
+- [ ] **M3** — Mic capture, meter, waveform (manual QA only)
+- [ ] **M4** — Take recording end-to-end (POST → ffmpeg → state)
+- [ ] **M5** — Take playback, keeper selection, delete (full autosave)
+- [ ] **M6** — Reference audio (fetch script + espeak fallback + isolation test)
+- [ ] **M7** — Export pipeline (golden-file manifest test + BaseSkill drop-in verified)
+- [ ] **M8** — Privacy flag + per-bank `.gitignore` (drift detection + sync + PUT config)
+- [ ] **M9** — New-bank flow + polish (shortcuts, toasts, end-to-end gate)
+
+**v1 completion gate:** a recorded bank exported from this tool plays
+correctly in BaseSkill's `WordLibraryExplorer` with no console
+errors, every spec §10.2 shortcut works, and every private bank's
+per-bank `.gitignore` passes drift verification.
