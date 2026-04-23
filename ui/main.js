@@ -2,8 +2,9 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at https://mozilla.org/MPL/2.0/.
 
-import { getBank, getBanks, getHealth } from "/ui/api.js";
+import { getBank, getBanks, getHealth, postTake } from "/ui/api.js";
 import { requestMic, startMeter } from "/ui/audio.js";
+import { isRecording, startRecording, stopRecording } from "/ui/record.js";
 
 const banner = document.getElementById("health-banner");
 const recordButton = document.getElementById("record");
@@ -24,6 +25,11 @@ let currentBank = null;
 let selectedPhonemeId = null;
 let meterPeakHoldDb = METER_DB_FLOOR;
 let meterLastTimestamp = null;
+let micStream = null;
+let toolsOk = false;
+let activeRecordingPhonemeId = null;
+let savingTake = false;
+const toastElement = ensureToast();
 
 async function init() {
   renderHealth(await safeGetHealth());
@@ -31,6 +37,7 @@ async function init() {
   window.addEventListener("keydown", handleKeyDown);
   bankSelect.addEventListener("change", () => loadBank(bankSelect.value));
   micGrantButton.addEventListener("click", grantMicAndStartMeter);
+  recordButton.addEventListener("click", toggleRecording);
 }
 
 async function safeGetHealth() {
@@ -51,6 +58,8 @@ function renderHealth(body) {
   if (body?.error) {
     banner.classList.add("health-banner--missing");
     banner.textContent = `Health check failed: ${body.error}`;
+    toolsOk = false;
+    updateRecordButton();
     return;
   }
 
@@ -61,13 +70,13 @@ function renderHealth(body) {
   if (missing.length === 0) {
     banner.classList.add("health-banner--ready");
     banner.textContent = `Ready · v${body.version}`;
+    toolsOk = true;
   } else {
     banner.classList.add("health-banner--missing");
     banner.textContent = `Missing: ${missing.join(", ")} — brew install ${missing.join(" ")}`;
+    toolsOk = false;
   }
-  // Record button stays disabled until both mic is granted (M3)
-  // and the recording wiring lands (M4).
-  recordButton.disabled = true;
+  updateRecordButton();
 }
 
 async function loadBanks() {
@@ -165,6 +174,9 @@ function selectPhoneme(id) {
 }
 
 function renderDetail(phoneme) {
+  const phonemeState = currentBank?.state?.phonemes?.[phoneme.id] ?? {};
+  const takes = phonemeState.takes ?? [];
+  const keeperTakeId = phonemeState.keeper_take ?? null;
   phonemeDetail.innerHTML = `
     <div class="phoneme-detail__header">
       <span class="phoneme-detail__ipa">${escapeHtml(phoneme.ipa)}</span>
@@ -175,8 +187,29 @@ function renderDetail(phoneme) {
       <dt>Category</dt><dd>${escapeHtml(phoneme.category ?? "—")}</dd>
       <dt>Loopable</dt><dd>${phoneme.loopable ? "yes" : "no"}</dd>
     </dl>
-    <p class="placeholder">No takes yet. Recording arrives in Milestone 4.</p>
+    <h2 class="takes-heading">Takes (${takes.length})</h2>
+    ${takes.length === 0
+      ? '<p class="placeholder">No takes yet. Select this phoneme and press R (or click Record).</p>'
+      : `<ul class="takes-list">${takes.map((t) => renderTakeRow(t, keeperTakeId)).join("")}</ul>`}
   `;
+}
+
+function renderTakeRow(take, keeperTakeId) {
+  const isKeeper = take.id === keeperTakeId;
+  return `
+    <li class="takes-item${isKeeper ? " takes-item--keeper" : ""}">
+      <span class="takes-item__id">${escapeHtml(take.id)}</span>
+      <span class="takes-item__duration">${take.duration_ms} ms</span>
+      <span class="takes-item__peak">peak ${formatDb(take.peak_db)}</span>
+      <span class="takes-item__rms">rms ${formatDb(take.rms_db)}</span>
+      ${isKeeper ? '<span class="takes-item__keeper">★ keeper</span>' : '<span></span>'}
+    </li>
+  `;
+}
+
+function formatDb(db) {
+  const sign = db > 0 ? "+" : "";
+  return `${sign}${Number(db).toFixed(1)} dB`;
 }
 
 function renderEmpty(message) {
@@ -187,15 +220,24 @@ function renderEmpty(message) {
 function handleKeyDown(event) {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
-  if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return;
-  if (!currentBank?.config.phonemes?.length) return;
 
-  event.preventDefault();
-  const ids = currentBank.config.phonemes.map((p) => p.id);
-  const idx = Math.max(0, ids.indexOf(selectedPhonemeId));
-  const delta = event.key === "ArrowUp" ? -1 : 1;
-  const next = (idx + delta + ids.length) % ids.length;
-  selectPhoneme(ids[next]);
+  if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+    if (!currentBank?.config.phonemes?.length) return;
+    event.preventDefault();
+    const ids = currentBank.config.phonemes.map((p) => p.id);
+    const idx = Math.max(0, ids.indexOf(selectedPhonemeId));
+    const delta = event.key === "ArrowUp" ? -1 : 1;
+    const next = (idx + delta + ids.length) % ids.length;
+    selectPhoneme(ids[next]);
+    return;
+  }
+
+  if (event.key === "r" || event.key === "R") {
+    if (!micStream) return;
+    event.preventDefault();
+    toggleRecording();
+    return;
+  }
 }
 
 function escapeHtml(value) {
@@ -213,13 +255,15 @@ async function grantMicAndStartMeter() {
   micGrantButton.textContent = "Waiting…";
   micErrorBanner.hidden = true;
   try {
-    const { device } = await requestMic();
+    const { stream, device } = await requestMic();
+    micStream = stream;
     micGrantButton.hidden = true;
     micDeviceLabel.hidden = false;
     micDeviceLabel.textContent = device;
     sizeMeterCanvas();
     window.addEventListener("resize", sizeMeterCanvas);
     startMeter(paintMeter);
+    updateRecordButton();
   } catch (err) {
     micGrantButton.disabled = false;
     micGrantButton.textContent = "Grant microphone";
@@ -244,6 +288,119 @@ function sizeMeterCanvas() {
   if (rect.width === 0) return;
   meterCanvas.width = Math.floor(rect.width * dpr);
   meterCanvas.height = Math.floor(rect.height * dpr);
+}
+
+function toggleRecording() {
+  if (!micStream || savingTake) return;
+  if (isRecording()) {
+    finishRecording();
+  } else {
+    startTake();
+  }
+}
+
+function startTake() {
+  if (!selectedPhonemeId) {
+    showToast("Select a phoneme first", "error");
+    return;
+  }
+  try {
+    startRecording(micStream);
+    activeRecordingPhonemeId = selectedPhonemeId;
+    updateRecordButton();
+  } catch (err) {
+    showToast(`Recording failed: ${err.message}`, "error");
+  }
+}
+
+async function finishRecording() {
+  const phonemeId = activeRecordingPhonemeId;
+  const bankId = bankSelect.value;
+  activeRecordingPhonemeId = null;
+  savingTake = true;
+  updateRecordButton();
+  let blob;
+  try {
+    ({ blob } = await stopRecording());
+  } catch (err) {
+    savingTake = false;
+    updateRecordButton();
+    showToast(`Recording error: ${err.message}`, "error");
+    return;
+  }
+  updateRecordButton();
+  try {
+    const take = await postTake(bankId, phonemeId, blob);
+    applyTakeLocally(phonemeId, take);
+    showToast(
+      `Saved ${take.take_id} · ${take.duration_ms} ms · peak ${formatDb(take.peak_db)}`,
+      "success",
+    );
+  } catch (err) {
+    const detail = err.body?.detail ? ` — ${err.body.detail.slice(0, 200)}` : "";
+    showToast(`Save failed: ${err.message}${detail}`, "error");
+  } finally {
+    savingTake = false;
+    updateRecordButton();
+  }
+}
+
+function applyTakeLocally(phonemeId, take) {
+  if (!currentBank) return;
+  const phonemes = currentBank.state.phonemes ??= {};
+  if (!phonemes[phonemeId]) {
+    phonemes[phonemeId] = { keeper_take: null, takes: [] };
+  }
+  phonemes[phonemeId].takes.push({
+    id: take.take_id,
+    created_at: take.created_at,
+    duration_ms: take.duration_ms,
+    peak_db: take.peak_db,
+    rms_db: take.rms_db,
+    notes: "",
+  });
+  currentBank.state.last_phoneme_id = phonemeId;
+  renderPhonemeList(currentBank);
+  selectPhoneme(phonemeId);
+}
+
+function updateRecordButton() {
+  if (savingTake) {
+    recordButton.disabled = true;
+    recordButton.textContent = "Saving…";
+    recordButton.classList.remove("record-button--recording");
+    return;
+  }
+  const recording = isRecording();
+  if (!micStream) {
+    recordButton.disabled = true;
+  } else if (recording) {
+    recordButton.disabled = false;
+  } else {
+    recordButton.disabled = !toolsOk;
+  }
+  recordButton.textContent = recording ? "Stop" : "Record";
+  recordButton.classList.toggle("record-button--recording", recording);
+}
+
+function ensureToast() {
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.hidden = true;
+  document.body.appendChild(el);
+  return el;
+}
+
+let toastTimer = null;
+function showToast(message, kind = "info") {
+  toastElement.className = `toast toast--${kind}`;
+  toastElement.textContent = message;
+  toastElement.hidden = false;
+  clearTimeout(toastTimer);
+  const duration = kind === "error" ? 6000 : 3000;
+  toastTimer = setTimeout(() => {
+    toastElement.hidden = true;
+  }, duration);
 }
 
 function paintMeter({ peakDb, rmsDb }) {
