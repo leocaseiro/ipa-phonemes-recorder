@@ -136,21 +136,14 @@ ipa-phonemes-recorder/
     ├── __init__.py
     ├── fixtures/
     │   ├── banks/
-    │   │   └── en-test/                  # tiny bank used across tests
+    │   │   └── en-test/                  # 3-phoneme bank used by the export test
     │   │       ├── config.json
     │   │       ├── state.json
     │   │       └── raw/<pid>/take-001.wav
     │   └── golden/
-    │       ├── phonemes.json             # golden manifest for M7
-    │       └── phonemes-meta.json        # expected durations / bounds
-    ├── test_app.py                       # M1
-    ├── test_banks.py                     # M2
-    ├── test_schema.py                    # M2
-    ├── test_takes.py                     # M4
-    ├── test_state.py                     # M4
-    ├── test_references.py                # M6
-    ├── test_export.py                    # M7
-    └── test_gitignore.py                 # M8
+    │       ├── phonemes.json             # byte-exact manifest for M7
+    │       └── phonemes-meta.json        # expected durations + tolerances
+    └── test_export.py                    # M7: the only automated test in v1
 ```
 
 Milestone annotations show when each file first appears. The tree is a
@@ -216,53 +209,66 @@ extend to code milestones, which return to the branch-per-PR flow.
 
 ## 5. Testing strategy
 
-### 5.1 What we test
+Manual QA is the primary verification path for v1. The app is small,
+the user records and plays back constantly during development, and
+most bugs surface immediately in use. Automated tests are reserved
+for the one class of failure manual testing cannot catch.
 
-| Layer | Tool | Scope |
-| --- | --- | --- |
-| Python modules | `unittest` (stdlib) | Schema validation, state I/O, take metadata math, export pipeline, gitignore sync |
-| HTTP endpoints | `unittest` against in-process `http.server` | Route wiring, status codes, request/response shapes |
-| ffmpeg pipeline | Golden-file comparison on manifest; tolerance-based compare on MP3 | Manifest JSON exact-match; MP3 duration and sample-rate within bounds |
-| UI | Manual only | Four-zone layout, keyboard shortcuts, record/play cycle, privacy confirmations |
-| End-to-end | Manual | Export bank, drop into `base-skill/public/audio/`, verify in `WordLibraryExplorer` story |
+### 5.1 The single automated test
 
-### 5.2 Test runner
+**Export manifest shape.** BaseSkill (spec §5) does no schema
+validation on `phonemes.json` — a missing key, wrong type, or extra
+field means silent playback failure with no console error. Manual
+listening cannot distinguish "phoneme skipped because the manifest
+was malformed" from "phoneme plays at the wrong offset". A
+golden-file comparison catches this for pennies.
 
-`python3 -m unittest discover tests` from the repo root. Exit code is
-the CI signal (if CI is added later). No external runner, no
-coverage tool in v1.
+Implementation:
 
-### 5.3 Fixtures
+- Fixture bank at `tests/fixtures/banks/en-test/` — three phonemes
+  (`sh`, `k`, `ee`) covering loopable consonant, non-loopable
+  consonant, and vowel. One committed keeper WAV per phoneme, each
+  22.05 kHz mono under 20 kB.
+- Golden outputs at `tests/fixtures/golden/`:
+  - `phonemes.json` — byte-exact manifest comparison.
+  - `phonemes-meta.json` — total MP3 duration + per-phoneme
+    tolerance pair (`start_tolerance_ms`, `duration_tolerance_ms`),
+    since MP3 frame padding shifts by a few ms across lame builds.
+- Two `unittest` cases in `tests/test_export.py`:
+  - `test_export_manifest_matches_golden`.
+  - `test_export_mp3_properties` — sample rate 22050, channels 1,
+    total duration within tolerance.
 
-A single fixture bank lives at `tests/fixtures/banks/en-test/` with
-three phonemes (`sh`, `k`, `ee`) chosen to exercise loopable vs
-non-loopable vs vowel. Each has one keeper WAV committed (22.05 kHz
-mono, under 20 kB each) so export tests are fully offline.
+Runner: `python3 -m unittest tests.test_export`. Pre-export-milestone
+there is nothing to run.
 
-Golden outputs for the export test live at `tests/fixtures/golden/`:
+### 5.2 Manual verification per milestone
 
-- `phonemes.json` — byte-exact manifest comparison.
-- `phonemes-meta.json` — expected total duration in ms and a
-  per-phoneme `{start_tolerance_ms, duration_tolerance_ms}` pair.
-  Tolerances exist because MP3 frame boundaries shift by a few ms
-  across lame versions.
+Each milestone's **Acceptance** subsection lists the manual checks
+that gate completion. These replace the test suite as the pass/fail
+signal. Typical checks: record, play back, inspect `state.json` on
+disk, eyeball the UI layout, drop the export into BaseSkill's
+`public/audio/` and verify in `WordLibraryExplorer`.
 
-### 5.4 TDD policy
+### 5.3 Bug-fix TDD still applies
 
-Per CLAUDE.md:
+Per CLAUDE.md: any bug found after a milestone is complete ships
+with a failing regression test that reproduces the bug before the
+fix lands. That rule is orthogonal to the "no tests for features"
+relaxation — it prevents the same bug re-emerging. If a regression
+test requires new modules or fixtures, that plumbing is in scope for
+the fix.
 
-- **Bug fixes:** failing test first, confirm repro, then fix.
-- **Features:** tests alongside the implementation, not after. For
-  each milestone below, the "Tests" subsection lists tests to write
-  before or alongside the corresponding feature code. Milestone
-  acceptance requires these tests green.
+### 5.4 Tools used for manual QA
 
-### 5.5 What we deliberately don't test
-
-- Browser audio playback (manual QA).
-- `MediaRecorder` (browser-only; manual QA).
-- Actual ffmpeg binary output byte-for-byte (too brittle).
-- Third-party attribution strings (static).
+- Browser DevTools for network + console during record / play.
+- `afplay banks/<bank>/raw/<pid>/take-NNN.wav` to verify raw WAVs
+  on disk.
+- `ffprobe banks/<bank>/dist/phonemes.mp3` to spot-check exported
+  sprite duration and codec.
+- `python3 -m json.tool banks/<bank>/state.json` to read state.
+- BaseSkill's `WordLibraryExplorer` Storybook story as the v1
+  completion gate.
 
 ---
 
@@ -319,8 +325,6 @@ empty four-zone layout with a health banner driven by
 | `ui/index.html` | Four-zone skeleton: top bar, left panel, centre panel, bottom meter zone. Placeholders only. |
 | `ui/main.js` | ES-module entrypoint. Fetches `/api/health`, renders tool-status banner. |
 | `ui/styles.css` | CSS grid for the four zones, dark palette, basic typography. |
-| `tests/__init__.py` | Empty. |
-| `tests/test_app.py` | Health endpoint + static-file route tests. |
 | `.gitignore` (amend) | Add `tmp/` and `.DS_Store` if not already covered. |
 
 ### 7.2 Server shape
@@ -360,25 +364,15 @@ Four-zone CSS grid layout (per spec §10.1), placeholders only:
 `main.js` at M1 does one thing: fetch `/api/health`, flip the banner
 class, disable the record button if any tool missing.
 
-### 7.4 Tests (write alongside)
-
-- `test_health_ok_when_tools_present` — monkeypatch `shutil.which` to
-  return truthy, assert 200 + payload shape.
-- `test_health_flags_missing_ffmpeg` — monkeypatch `which('ffmpeg')`
-  to None, assert `tools.ffmpeg == false`.
-- `test_index_served_at_root` — GET `/`, assert 200 and
-  `Content-Type: text/html`.
-- `test_static_traversal_rejected` — GET `/ui/../../etc/passwd`,
-  assert 400 or 404 (not 200).
-
-### 7.5 Acceptance
+### 7.4 Acceptance
 
 - `python3 -m server.app --port 8766` starts without error.
 - `curl http://localhost:8766/api/health` returns expected JSON.
 - Chrome loads `http://localhost:8766/`; four zones visible; health
   banner reflects reality (try `PATH=/ python3 -m server.app` to
   force missing tools).
-- `python3 -m unittest discover tests` passes.
+- Spot-check: `curl -i http://localhost:8766/ui/../../etc/passwd`
+  returns 4xx, not 200.
 
 ---
 
@@ -399,11 +393,6 @@ IPA glyph and example word in the centre panel. No recording yet.
 | `banks/en-au-leo/config.json` | Seed dev bank; `privacy: "private"`, ~10-phoneme subset for local dev. |
 | `banks/en-au-leo/.gitignore` | `dist/` (private bank). |
 | `banks/en-au-leo/raw/.gitkeep` | So the directory survives the gitignore. |
-| `tests/test_schema.py` | Schema validation unit tests. |
-| `tests/test_banks.py` | Bank discovery + read tests. |
-| `tests/test_state.py` | Atomic state I/O + corrupt-file recovery tests. |
-| `tests/fixtures/banks/en-test/config.json` | 3-phoneme fixture. |
-| `tests/fixtures/banks/en-test/state.json` | Empty (no takes yet). |
 
 ### 8.2 Endpoints added
 
@@ -431,34 +420,15 @@ IPA glyph and example word in the centre panel. No recording yet.
 - Clicking a phoneme (or `↑/↓`) updates `<section id="phoneme-detail">` with IPA glyph (large), example word, and a placeholder "No takes yet".
 - Privacy badge in the top bar: green "Public" or red "Private" with a lock icon.
 
-### 8.5 Tests
-
-- `test_schema.py`:
-  - `test_valid_public_bank_passes`
-  - `test_valid_private_bank_passes`
-  - `test_missing_attribution_rejected_for_public`
-  - `test_invalid_privacy_value_rejected`
-  - `test_duplicate_phoneme_id_rejected`
-  - `test_duplicate_ipa_rejected`
-  - `test_non_slug_phoneme_id_rejected`
-- `test_banks.py`:
-  - `test_list_banks_empty_returns_empty_list`
-  - `test_list_banks_skips_non_directories`
-  - `test_list_banks_skips_folder_without_config`
-  - `test_read_bank_returns_config_and_state`
-  - `test_read_bank_with_invalid_config_raises`
-- `test_state.py`:
-  - `test_read_state_missing_returns_empty`
-  - `test_read_state_corrupt_renames_and_returns_empty`
-  - `test_write_state_is_atomic` (write to a path, kill mid-write simulated via patching `os.replace` to raise, assert target unchanged)
-
-### 8.6 Acceptance
+### 8.5 Acceptance
 
 - `/api/banks` returns `en-au-leo`.
 - `/api/banks/en-au-leo` returns the seed config + empty state.
 - UI shows the bank, the phoneme list, the IPA detail, and the red
   "Private" badge.
-- All tests green.
+- Hand-edit `banks/en-au-leo/config.json` to set `privacy: "bogus"`,
+  reload → `/api/banks/en-au-leo` returns 422 with validator errors.
+  Revert the edit.
 
 ---
 
@@ -548,9 +518,6 @@ happy path from mic → disk.
 | `ui/record.js` | MediaRecorder wrapper: `startRecording()`, `stopRecording() -> Blob`, `onError`. Supports Opus-in-WebM. |
 | `ui/main.js` | Wire record button + `R` key, POST blob on stop, refresh detail pane. |
 | `ui/styles.css` | Recording state: pulsing red circle on the button, disabled state for non-record controls while active. |
-| `tests/test_takes.py` | Numbering, metadata, transcode invocation (mocked). |
-| `tests/test_audio_meta.py` | Peak/RMS math against a known fixture WAV. |
-| `tests/fixtures/audio/sine_-6dbfs_440hz_500ms.wav` | Deterministic 48 kHz mono 16-bit fixture for audio_meta tests. |
 
 ### 10.2 Endpoint
 
@@ -632,32 +599,19 @@ write_state(bank_path, state)
   it, render waveform.
 - On error: toast with `error.message`; do not mutate UI state.
 
-### 10.7 Tests
-
-- `test_audio_meta.py`:
-  - `test_peak_rms_of_known_sine` — the -6 dBFS fixture must produce
-    `peak_db ≈ -6.0` (±0.5) and `rms_db ≈ -9.0` (±0.5). Duration must
-    equal 500 ms ±5.
-- `test_takes.py`:
-  - `test_next_take_id_starts_at_001_when_empty`
-  - `test_next_take_id_is_max_plus_one`
-  - `test_next_take_id_ignores_deleted_state_entries` (max comes
-    from disk scan, not just state)
-  - `test_save_take_writes_wav_and_updates_state` (mock ffmpeg
-    subprocess by replacing it with a stub that writes a fixture WAV)
-  - `test_save_take_rolls_back_state_on_ffmpeg_failure`
-  - `test_save_take_rejects_unknown_phoneme_id`
-
-### 10.8 Acceptance
+### 10.7 Acceptance
 
 - Record a 1-second "shhh" in the UI, stop, observe:
   - `raw/sh/take-001.wav` appears, ~96 kB, playable in `afplay`.
-  - `state.json` gains the take entry with plausible metadata.
+  - `state.json` gains the take entry with plausible metadata
+    (duration a few hundred ms, peak/rms in dBFS).
   - UI shows the take row with duration, peak, rms.
 - Record a second take, delete `take-001` by hand from
   `state.json`, record a third — it must be `take-003`, not
   `take-002`.
-- All new tests green.
+- Force a ffmpeg failure (rename the binary temporarily) → POST
+  returns 500 with `error.code = "ffmpeg_failed"`; `state.json` is
+  unchanged.
 
 ---
 
@@ -678,8 +632,6 @@ survive a reload.
 | `ui/takes.js` | New module. Renders takes list, wires per-row play / keeper radio / delete buttons. |
 | `ui/main.js` | Keyboard shortcuts: `Space`, `Enter`, `Backspace`. |
 | `ui/styles.css` | Takes list layout, keeper radio styling, confirm-dialog overlay. |
-| `tests/test_takes.py` | Extend with delete tests. |
-| `tests/test_state.py` | Extend with keeper tests. |
 
 ### 11.2 Endpoints
 
@@ -718,23 +670,7 @@ Reject if:
   take-002? [Delete] [Cancel]"). On confirm: DELETE request,
   optimistic removal, on failure re-insert row and toast.
 
-### 11.5 Tests
-
-- `test_takes.py` additions:
-  - `test_delete_removes_wav_and_state_entry`
-  - `test_delete_clears_keeper_if_it_was_this_take`
-  - `test_delete_preserves_sibling_take_ids` (deleting 002 does not
-    renumber 003 to 002)
-  - `test_delete_nonexistent_returns_404`
-  - `test_serve_wav_sets_content_type` (via endpoint test)
-- `test_state.py` additions:
-  - `test_update_keeper_sets_flag`
-  - `test_update_keeper_clears_previous`
-  - `test_update_keeper_rejects_unknown_take_id`
-  - `test_put_state_roundtrip` (endpoint: PUT then GET, content
-    equal)
-
-### 11.6 Acceptance
+### 11.5 Acceptance
 
 - Record 3 takes of `sh`. Pick take-002 as keeper. Reload the page.
   Status glyph for `sh` is `✓`, take-002 is selected.
@@ -745,7 +681,6 @@ Reject if:
 - Manual: kill the server mid-PUT (SIGKILL), restart, verify
   `state.json` is either the pre-PUT or post-PUT snapshot, never a
   half-written mess.
-- All new tests green.
 
 ---
 
@@ -755,7 +690,7 @@ Reject if:
 reference for the selected phoneme. If the Wikimedia OGG has been
 fetched it plays that (with an attribution line); otherwise the
 server synthesises via espeak-ng and streams the result. The export
-pipeline is provably isolated from `references/`.
+pipeline is structurally isolated from `references/`.
 
 ### 12.1 Files created
 
@@ -768,7 +703,6 @@ pipeline is provably isolated from `references/`.
 | `ui/reference.js` | `playReference(bankId, phonemeId)` — fetch, play via AudioContext, show attribution overlay for the OGG case. |
 | `ui/main.js` | Wire `G` key and "Play reference" button. |
 | `references/ATTRIBUTION.md` | Created on first fetch; header + one row per downloaded file. |
-| `tests/test_references.py` | Fallback logic + isolation guarantee tests. |
 
 ### 12.2 Endpoint
 
@@ -856,29 +790,14 @@ No disk I/O for the fallback — the WAV lives entirely in memory.
 ### 12.5 Isolation guarantee
 
 `server/export.py` (M7) **must not** open any path outside the
-bank's own root. The export test harness patches `builtins.open` to
-record every path read during an export call and asserts none start
-with `references/`. This is not a best-effort lint; it is an
-assertion that fails the build.
+bank's own root. Enforcement is structural: the export module
+imports no helper that accesses `references/`, and every file open
+in the pipeline is reviewed against this rule during M7. No runtime
+assertion in v1 — manual code review plus the fact that the pipeline
+parameters (`bank_path`, `tmp_root`) never receive a references path
+are the guards.
 
-### 12.6 Tests
-
-- `test_references.py`:
-  - `test_serve_ogg_when_present` — drop a fixture `sh.ogg` into a
-    temp references dir, assert bytes match and Content-Type is
-    `audio/ogg`.
-  - `test_attribution_header_set_for_ogg_source`.
-  - `test_espeak_fallback_invoked_when_ogg_missing` — mock
-    `subprocess.run` to return a canned WAV, assert it was called
-    with expected args and the response carries it.
-  - `test_espeak_unavailable_returns_502` — mock `shutil.which` to
-    return None.
-  - `test_espeak_no_mapping_returns_502` — phoneme with IPA not in
-    the map.
-- `test_export.py` (landed here but exercised in M7):
-  - `test_export_never_opens_references_dir` — see §12.5.
-
-### 12.7 Acceptance
+### 12.6 Acceptance
 
 - Run `python3 scripts/fetch_references.py` → OGGs appear under
   `references/`, `ATTRIBUTION.md` lists each with its Commons
@@ -887,7 +806,8 @@ assertion that fails the build.
   attribution line visible during playback.
 - Delete `references/sh.ogg` → press `G` → espeak-ng synthesis plays;
   no attribution line shown.
-- Unit tests green, including the export isolation test.
+- Grep check: `grep -R "references" server/export.py` returns no
+  matches (cheap structural confirmation of §12.5).
 
 ---
 
@@ -904,7 +824,10 @@ dropped into BaseSkill's `public/audio/`.
 | --- | --- |
 | `server/export.py` | Full pipeline: read config+state, select keepers, run ffmpeg filter chain per keeper into `tmp/`, concat with silent gaps, encode MP3, build manifest with cumulative offsets, write `dist/`. |
 | `server/ffmpeg_util.py` | Thin subprocess wrappers: `run(cmd, *, check=True) -> CompletedProcess`; `probe_duration_ms(path) -> int` via `ffprobe`. Also: `FFmpegError` with stderr captured. |
-| `tests/test_export.py` | Golden manifest comparison + MP3 property bounds + mode tests + isolation test. |
+| `tests/__init__.py` | Empty; marks the package so `python3 -m unittest tests.test_export` works. |
+| `tests/test_export.py` | The two automated cases: golden manifest comparison + MP3 property bounds. |
+| `tests/fixtures/banks/en-test/config.json` | 3-phoneme fixture bank. |
+| `tests/fixtures/banks/en-test/state.json` | Keeper pointers for the three fixture takes. |
 | `tests/fixtures/banks/en-test/raw/sh/take-001.wav` | Keeper WAV used by the export test. |
 | `tests/fixtures/banks/en-test/raw/k/take-001.wav` | Keeper WAV. |
 | `tests/fixtures/banks/en-test/raw/ee/take-001.wav` | Keeper WAV. |
@@ -1021,33 +944,22 @@ drift, auto-fix before writing. If auto-fix fails, return 409.
 failure, leave tmp intact and include the tmp path in the error
 response for debugging.
 
-### 13.4 Tests
+### 13.4 Automated tests (the only ones in v1)
 
-- `test_export_manifest_matches_golden` — fixture `en-test` bank,
-  mock `loudnorm` to a null filter (or disable normalisation via a
-  config override used only in tests) so the output is deterministic.
-  Manifest must equal `tests/fixtures/golden/phonemes.json` byte-for-byte.
-- `test_export_mp3_properties` — decoded MP3 has sample rate 22050,
-  channels 1, and total duration within the tolerance defined in
-  `phonemes-meta.json`.
-- `test_export_skips_missing_keepers_in_skip_mode` — en-test bank
-  with one phoneme missing its keeper, mode=skip, response lists it
-  in `skipped`, manifest omits the key, MP3 is shorter.
-- `test_export_fails_missing_keepers_in_fail_mode` — same setup
-  returns 400 `missing_keepers`, no files written.
-- `test_export_zero_keepers_returns_400` — empty state, 400
-  `zero_keepers`.
-- `test_export_never_opens_references_dir` — see §12.5. Patch
-  `builtins.open` with a read recorder, assert no path under
-  `references/` is read.
-- `test_export_intermediate_files_cleaned_up_on_success`.
-- `test_export_intermediate_files_preserved_on_failure` — force an
-  ffmpeg step to fail (rename binary temporarily or patch
-  `ffmpeg_util.run` to raise); assert `tmp/<bank-id>/` is still
-  present.
-- `test_export_loudnorm_override_not_in_production_code` —
-  meta-test: the config override used only for deterministic tests
-  must not leak into the production default.
+Two `unittest` cases in `tests/test_export.py`:
+
+- `test_export_manifest_matches_golden` — run the pipeline against
+  `tests/fixtures/banks/en-test/`. To keep output deterministic
+  across lame / ffmpeg builds, the test invokes `export_bank(...,
+  deterministic=True)` which substitutes `loudnorm` for a null
+  filter. Manifest must equal `tests/fixtures/golden/phonemes.json`
+  byte-for-byte.
+- `test_export_mp3_properties` — decode the resulting MP3 via
+  `ffprobe`, assert sample rate 22050, channel count 1, and total
+  duration within the tolerance in `phonemes-meta.json`.
+
+Runner: `python3 -m unittest tests.test_export`. This is the only
+automated check for v1 — everything else is manual per §5.
 
 ### 13.5 Acceptance
 
@@ -1057,7 +969,12 @@ response for debugging.
   `~/Sites/base-skill/public/audio/`. Open the BaseSkill
   `WordLibraryExplorer` Storybook story. Playback of every included
   phoneme works, loopable phonemes sustain, no console errors.
-- All export tests green.
+- `python3 -m unittest tests.test_export` passes.
+- Edge cases checked manually: export with zero keepers returns 400;
+  export with one missing keeper and `on_missing_keeper=skip` omits
+  that phoneme from the manifest; same setup with `fail` returns
+  400 and writes no files; after a forced ffmpeg failure
+  `tmp/<bank-id>/` is still present for debugging.
 
 ---
 
@@ -1080,7 +997,6 @@ bank whose `.gitignore` is drifted.
 | `ui/privacy.js` | Badge click handler, confirm modal, attribution textbox. |
 | `ui/main.js` | Mount privacy.js; on bank load, render drift warning if present. |
 | `ui/styles.css` | Modal styling, drift-warning banner (yellow). |
-| `tests/test_gitignore.py` | Sync, drift detection, atomic write, expected content. |
 
 ### 14.2 `.gitignore` content rules
 
@@ -1144,29 +1060,7 @@ editing in the UI is out of scope for v1.
   (no-op flip) to trigger a re-sync, or a dedicated endpoint if we
   add one.
 
-### 14.5 Tests
-
-- `test_gitignore.py`:
-  - `test_expected_private_is_dist_slash`
-  - `test_expected_public_is_empty`
-  - `test_verify_ok_when_private_and_file_matches`
-  - `test_verify_missing_when_private_and_file_absent`
-  - `test_verify_drifted_when_file_has_extra_lines`
-  - `test_verify_ok_when_public_and_file_absent`
-  - `test_verify_ok_when_public_and_file_empty`
-  - `test_verify_drifted_when_public_and_file_has_content`
-  - `test_sync_writes_expected_content_atomically`
-  - `test_sync_noop_when_already_ok`
-- `test_app.py` (endpoint tests):
-  - `test_put_config_flip_requires_confirm`
-  - `test_put_config_flip_requires_attribution_when_going_public`
-  - `test_put_config_rewrites_gitignore_after_flip`
-  - `test_put_config_rejects_unknown_fields`
-- `test_export.py`:
-  - `test_export_auto_syncs_gitignore_when_drifted_and_private`
-  - `test_export_returns_409_when_gitignore_sync_fails`
-
-### 14.6 Acceptance
+### 14.5 Acceptance
 
 - On a private bank with `dist/` in its `.gitignore`, `/api/banks/:id`
   reports `gitignore.status = "ok"` and no banner appears.
@@ -1178,11 +1072,12 @@ editing in the UI is out of scope for v1.
 - Flip completes → badge green, tooltip shows attribution, per-bank
   `.gitignore` is now empty (not missing; empty-file is fine per
   §14.2).
+- `curl -X PUT ... -d '{"privacy":"public"}'` without `confirm_flip`
+  → 400 `confirm_required`.
 - Run export on a private bank whose `.gitignore` is hand-deleted;
   export auto-syncs and succeeds. Delete `.gitignore` and make it
   read-only (`chmod 444`); export returns 409 `gitignore_drift` and
   no `dist/` bytes are written.
-- All new tests green.
 
 ---
 
@@ -1204,7 +1099,6 @@ and surfaces server errors without losing user state.
 | `ui/toasts.js` | Minimal toast queue (success / error / info). |
 | `ui/main.js` | Wire new-bank button, shortcut dispatcher, toast host. |
 | `ui/styles.css` | Modal + toast styles. Keyboard focus rings. |
-| `tests/test_banks.py` | New-bank creation tests. |
 
 ### 15.2 Endpoint
 
@@ -1269,19 +1163,7 @@ The new bank is always created with `privacy: "private"` and no
 - **No auto-focus traps** — every modal closes on `Esc` and focuses
   the element that opened it on close.
 
-### 15.5 Tests
-
-- `test_banks.py` additions:
-  - `test_create_bank_writes_skeleton`
-  - `test_create_bank_defaults_to_private`
-  - `test_create_bank_writes_per_bank_gitignore`
-  - `test_create_bank_rejects_duplicate_id`
-  - `test_create_bank_rejects_invalid_slug`
-  - `test_create_bank_copies_phoneme_inventory_from_source`
-  - `test_create_bank_with_english_basic_seed`
-  - `test_create_bank_ignores_speaker_recordings_when_copying`
-
-### 15.6 Acceptance
+### 15.5 Acceptance
 
 - Create a new bank `en-us-sam` using the English-basic inventory →
   folder appears with config, empty state, private `.gitignore`.
@@ -1290,14 +1172,16 @@ The new bank is always created with `privacy: "private"` and no
 - Create a second bank that copies `en-au-leo`'s inventory → new
   bank's phoneme array matches the source, but no recordings are
   copied.
+- Attempt to create a bank with a duplicate id → 409; with an
+  uppercase or space-containing id → 422.
 - Every spec §10.2 shortcut works when the phoneme list or takes
   list has focus, and is correctly suppressed when a text field has
   focus.
-- Pull the network cable (or `sudo ifconfig en0 down`) mid-autosave
-  → red toast, UI state unchanged, retry works once connectivity
-  returns. (Since this is localhost, the equivalent is stopping the
-  server mid-flight.)
-- All v1 tests green on `python3 -m unittest discover tests`.
+- Stop the server mid-autosave (Ctrl-C during a keeper flip) → red
+  "Save failed — retry?" toast; UI state unchanged; restart server
+  and retry works.
+- `python3 -m unittest tests.test_export` still passes after M9's
+  changes.
 - Manual end-to-end pass: record a 5-phoneme bank, export, drop into
   BaseSkill, verify in `WordLibraryExplorer`. **This is the v1
   completion gate.**
