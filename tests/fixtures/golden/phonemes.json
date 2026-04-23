@@ -1,0 +1,16 @@
+{
+  "ʃ": {
+    "start": 0,
+    "duration": 200,
+    "loopable": true
+  },
+  "k": {
+    "start": 225,
+    "duration": 100
+  },
+  "iː": {
+    "start": 350,
+    "duration": 300,
+    "loopable": true
+  }
+}

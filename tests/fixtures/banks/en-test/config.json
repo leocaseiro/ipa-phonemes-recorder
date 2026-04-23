@@ -1,0 +1,11 @@
+{
+  "name": "en-test fixture",
+  "locale": "en-TEST",
+  "privacy": "private",
+  "target_lufs": -16,
+  "phonemes": [
+    { "id": "sh", "ipa": "ʃ",  "example": "ship", "loopable": true,  "category": "consonant" },
+    { "id": "k",  "ipa": "k",  "example": "kite", "loopable": false, "category": "consonant" },
+    { "id": "ee", "ipa": "iː", "example": "see",  "loopable": true,  "category": "vowel" }
+  ]
+}
