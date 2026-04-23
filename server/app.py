@@ -16,14 +16,16 @@ if sys.version_info < (3, 10):
 
 import argparse
 import json
+import re
 import shutil
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
+from server.takes import TakeSaveFailed, save_take
 
 VERSION = "0.1.0"
 DEFAULT_PORT = 8766
@@ -34,6 +36,18 @@ STATIC_CONTENT_TYPES = {
     ".css": "text/css; charset=utf-8",
     ".map": "application/json",
 }
+
+UPLOAD_CONTENT_TYPES = {
+    "audio/webm": ".webm",
+    "audio/ogg": ".ogg",
+    "audio/wav": ".wav",
+    "audio/x-wav": ".wav",
+    "audio/wave": ".wav",
+}
+
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+
+TAKE_POST_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes$")
 
 
 @dataclass
@@ -90,6 +104,134 @@ class AppRequestHandler(BaseHTTPRequestHandler):
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"error": "internal_error", "message": str(exc)},
             )
+
+    def do_POST(self) -> None:  # noqa: N802 (stdlib naming)
+        path = urlparse(self.path).path
+        try:
+            match = TAKE_POST_RE.match(path)
+            if match:
+                bank_id, phoneme_id = match.groups()
+                self._create_take(bank_id, phoneme_id)
+            else:
+                self._send_json(
+                    HTTPStatus.NOT_FOUND,
+                    {"error": "not_found", "message": f"No route for POST {self.path}"},
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            self.log_error("handler crashed: %s", exc)
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": "internal_error", "message": str(exc)},
+            )
+
+    def _create_take(self, bank_id: str, phoneme_id: str) -> None:
+        try:
+            bank = read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        phoneme_ids = {p["id"] for p in bank["config"]["phonemes"]}
+        if phoneme_id not in phoneme_ids:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "error": "not_found",
+                    "message": f"phoneme {phoneme_id!r} not in bank {bank_id!r}",
+                },
+            )
+            return
+
+        raw_type = self.headers.get("Content-Type", "")
+        content_type = raw_type.split(";")[0].strip().lower()
+        src_ext = UPLOAD_CONTENT_TYPES.get(content_type)
+        if not src_ext:
+            self._send_json(
+                HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+                {
+                    "error": "unsupported_media_type",
+                    "message": (
+                        f"Content-Type {content_type!r} not supported; "
+                        f"expected one of {sorted(UPLOAD_CONTENT_TYPES)}"
+                    ),
+                },
+            )
+            return
+
+        length_header = self.headers.get("Content-Length")
+        if not length_header:
+            self._send_json(
+                HTTPStatus.LENGTH_REQUIRED,
+                {"error": "length_required", "message": "Content-Length header is required"},
+            )
+            return
+        try:
+            length = int(length_header)
+        except ValueError:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "invalid Content-Length"},
+            )
+            return
+        if length <= 0:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "empty body"},
+            )
+            return
+        if length > MAX_UPLOAD_BYTES:
+            self._send_json(
+                HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                {
+                    "error": "payload_too_large",
+                    "message": f"body size {length} exceeds limit {MAX_UPLOAD_BYTES}",
+                },
+            )
+            return
+
+        if self.config.ffmpeg is None:
+            self._send_json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "ffmpeg_unavailable",
+                    "message": "ffmpeg not found on PATH; install via brew install ffmpeg",
+                },
+            )
+            return
+
+        body = self.rfile.read(length)
+
+        try:
+            meta = save_take(
+                bank_path=self.config.repo_root / "banks" / bank_id,
+                phoneme_id=phoneme_id,
+                src_bytes=body,
+                src_ext=src_ext,
+                ffmpeg=self.config.ffmpeg,
+                tmp_root=self.config.repo_root / "tmp",
+            )
+        except TakeSaveFailed as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {
+                    "error": exc.code,
+                    "message": exc.message,
+                    "detail": exc.detail,
+                    "tmp_path": str(exc.tmp_path) if exc.tmp_path else None,
+                },
+            )
+            return
+
+        self._send_json(HTTPStatus.CREATED, asdict(meta))
 
     def _send_health(self) -> None:
         payload = {
