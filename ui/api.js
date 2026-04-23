@@ -96,6 +96,27 @@ export async function deleteTake(bankId, phonemeId, takeId) {
   }
 }
 
+export async function postBank(payload) {
+  const response = await fetch("/api/banks", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  let body = null;
+  try {
+    body = await response.json();
+  } catch {
+    // body stays null
+  }
+  if (!response.ok) {
+    const err = new Error(body?.message ?? `HTTP ${response.status}`);
+    err.status = response.status;
+    err.body = body;
+    throw err;
+  }
+  return body;
+}
+
 export async function putConfig(bankId, payload) {
   const response = await fetch(
     `/api/banks/${encodeURIComponent(bankId)}/config`,

@@ -10,6 +10,7 @@ import {
   getReference,
   getReferenceSources,
   getTakeWav,
+  postBank,
   postExport,
   postTake,
   putConfig,
@@ -43,6 +44,12 @@ const privacyModal = document.getElementById("privacy-modal");
 const privacyModalTitle = document.getElementById("privacy-modal-title");
 const privacyModalBody = document.getElementById("privacy-modal-body");
 const privacyModalActions = document.getElementById("privacy-modal-actions");
+const newBankButton = document.getElementById("new-bank-button");
+const newBankModal = document.getElementById("new-bank-modal");
+const newBankForm = document.getElementById("new-bank-form");
+const newBankError = document.getElementById("new-bank-error");
+const newBankInventorySelect = document.getElementById("new-bank-inventory");
+const newBankSubmit = document.getElementById("new-bank-submit");
 
 const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
@@ -90,6 +97,11 @@ async function init() {
   privacyBadge.addEventListener("click", openPrivacyFlipModal);
   privacyModal.addEventListener("click", handlePrivacyModalClick);
   gitignoreBanner.addEventListener("click", handleGitignoreBannerClick);
+  newBankButton.addEventListener("click", openNewBankModal);
+  newBankModal.addEventListener("click", (event) => {
+    if (event.target?.dataset?.action === "close-new-bank-modal") closeNewBankModal();
+  });
+  newBankForm.addEventListener("submit", submitNewBank);
   phonemeDetail.addEventListener("change", (e) => {
     if (e.target?.id === "ref-source") {
       localStorage.setItem("reference_source", e.target.value);
@@ -416,6 +428,15 @@ function handleKeyDown(event) {
     return;
   }
 
+  // New-bank modal — Escape closes; every other shortcut suppressed.
+  if (!newBankModal.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeNewBankModal();
+    }
+    return;
+  }
+
   // Delete-confirm acts as a modal: only Enter confirms and Escape cancels;
   // every other shortcut is ignored until the user resolves it.
   if (pendingDeleteTakeId) {
@@ -682,6 +703,83 @@ async function handlePrivacyModalClick(event) {
   if (action === "flip-to-private") {
     await applyPrivacyFlip({ privacy: "private", confirm_flip: true });
     return;
+  }
+}
+
+function openNewBankModal() {
+  populateInventorySelect();
+  newBankForm.reset();
+  newBankError.hidden = true;
+  newBankError.textContent = "";
+  newBankSubmit.disabled = false;
+  newBankSubmit.textContent = "Create bank";
+  newBankModal.hidden = false;
+  document.body.classList.add("modal-open");
+  document.getElementById("new-bank-id")?.focus();
+}
+
+function closeNewBankModal() {
+  newBankModal.hidden = true;
+  newBankError.hidden = true;
+  newBankError.textContent = "";
+  if (exportModal.hidden && privacyModal.hidden) {
+    document.body.classList.remove("modal-open");
+  }
+  newBankButton.focus();
+}
+
+function populateInventorySelect() {
+  const currentBanks = Array.from(bankSelect.options)
+    .map((o) => o.value)
+    .filter(Boolean);
+  const options = [
+    { value: "english-basic", label: "English basic (44 phonemes)" },
+    ...currentBanks.map((id) => ({
+      value: `copy:${id}`,
+      label: `Copy inventory from ${id}`,
+    })),
+  ];
+  newBankInventorySelect.innerHTML = options
+    .map(
+      (o) =>
+        `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`,
+    )
+    .join("");
+}
+
+async function submitNewBank(event) {
+  event.preventDefault();
+  newBankError.hidden = true;
+  newBankError.textContent = "";
+  newBankSubmit.disabled = true;
+  newBankSubmit.textContent = "Creating…";
+
+  const formData = new FormData(newBankForm);
+  const payload = {
+    id: (formData.get("id") ?? "").toString().trim(),
+    name: (formData.get("name") ?? "").toString().trim(),
+    locale: (formData.get("locale") ?? "").toString().trim(),
+    inventory_source: (formData.get("inventory_source") ?? "english-basic")
+      .toString(),
+  };
+  const speaker = (formData.get("speaker") ?? "").toString().trim();
+  if (speaker) payload.speaker = speaker;
+
+  try {
+    const result = await postBank(payload);
+    const newId = result.bank.id;
+    showToast(`Created ${newId} (private)`, "success");
+    closeNewBankModal();
+    localStorage.setItem("last_bank_id", newId);
+    await loadBanks();
+  } catch (err) {
+    newBankSubmit.disabled = false;
+    newBankSubmit.textContent = "Create bank";
+    const code = err.body?.error;
+    newBankError.hidden = false;
+    newBankError.textContent = code
+      ? `${code}: ${err.message}`
+      : err.message || "Create failed";
   }
 }
 

@@ -22,6 +22,9 @@
           </select>
         </label>
         <button id="privacy-badge" type="button" class="privacy-badge privacy-badge--unknown" hidden></button>
+        <button id="new-bank-button" class="new-bank-button" type="button">
+          + New bank
+        </button>
         <button id="export-button" class="export-button" type="button">
           Export <kbd>E</kbd>
         </button>
@@ -78,6 +81,103 @@
         <div id="privacy-modal-body" class="modal__body"></div>
         <div id="privacy-modal-actions" class="modal__actions"></div>
       </div>
+    </div>
+
+    <div
+      id="new-bank-modal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-bank-modal-title"
+      hidden
+    >
+      <div class="modal__backdrop" data-action="close-new-bank-modal"></div>
+      <form id="new-bank-form" class="modal__card">
+        <h2 id="new-bank-modal-title" class="modal__title">New bank</h2>
+        <div class="modal__body">
+          <label class="privacy-modal__label">
+            Bank id
+            <input
+              id="new-bank-id"
+              name="id"
+              type="text"
+              class="privacy-modal__input"
+              pattern="[a-z0-9][a-z0-9-]*"
+              placeholder="e.g. en-us-sam"
+              autocomplete="off"
+              required
+            />
+            <small class="new-bank-modal__hint">Lowercase, digits, hyphens. Becomes the folder name under <code>banks/</code>.</small>
+          </label>
+          <label class="privacy-modal__label">
+            Display name
+            <input
+              id="new-bank-name"
+              name="name"
+              type="text"
+              class="privacy-modal__input"
+              placeholder="e.g. General American — Sam"
+              autocomplete="off"
+              required
+            />
+          </label>
+          <label class="privacy-modal__label">
+            Locale (BCP-47)
+            <input
+              id="new-bank-locale"
+              name="locale"
+              type="text"
+              class="privacy-modal__input"
+              list="new-bank-locale-suggestions"
+              placeholder="e.g. en-US"
+              autocomplete="off"
+              required
+            />
+            <datalist id="new-bank-locale-suggestions">
+              <option value="en-AU"></option>
+              <option value="en-US"></option>
+              <option value="en-GB"></option>
+              <option value="en-NZ"></option>
+              <option value="en-CA"></option>
+              <option value="en-IE"></option>
+            </datalist>
+          </label>
+          <label class="privacy-modal__label">
+            Speaker (optional)
+            <input
+              id="new-bank-speaker"
+              name="speaker"
+              type="text"
+              class="privacy-modal__input"
+              placeholder="Who is recording this bank?"
+              autocomplete="off"
+            />
+          </label>
+          <label class="privacy-modal__label">
+            Phoneme inventory
+            <select
+              id="new-bank-inventory"
+              name="inventory_source"
+              class="privacy-modal__input"
+            ></select>
+          </label>
+          <p class="privacy-modal__warn new-bank-modal__privacy-note">
+            <strong>Default: private.</strong> Voice is biometric data; CC-BY-4.0
+            is effectively irrevocable once published. For minor speakers, keep
+            private unless you have long-term informed consent from the guardian.
+            Flip to public later from the Privacy badge.
+          </p>
+          <p id="new-bank-error" class="new-bank-modal__error" hidden></p>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="modal__btn" data-action="close-new-bank-modal">
+            Cancel
+          </button>
+          <button type="submit" class="modal__btn modal__btn--primary" id="new-bank-submit">
+            Create bank
+          </button>
+        </div>
+      </form>
     </div>
 
     <footer class="bottom-zone">

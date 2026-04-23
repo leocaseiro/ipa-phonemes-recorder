@@ -126,6 +126,53 @@ body {
   color: var(--fg-muted);
 }
 
+.new-bank-button {
+  padding: 6px 14px;
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.new-bank-button:hover {
+  border-color: var(--accent);
+  background: color-mix(in oklab, var(--accent) 14%, var(--bg-inset));
+}
+
+.new-bank-modal__hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--fg-muted);
+  text-transform: none;
+  letter-spacing: normal;
+  line-height: 1.4;
+}
+
+.new-bank-modal__hint code {
+  background: var(--bg-inset);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.new-bank-modal__privacy-note {
+  margin-top: 16px;
+}
+
+.new-bank-modal__error {
+  margin: 12px 0 0;
+  padding: 8px 10px;
+  background: color-mix(in oklab, var(--bad) 18%, transparent);
+  border-left: 3px solid var(--bad);
+  border-radius: 4px;
+  color: var(--bad);
+  font-size: 12px;
+}
+
 .export-button {
   padding: 6px 14px;
   background: var(--bg-inset);
