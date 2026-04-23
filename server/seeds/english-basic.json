@@ -1,0 +1,313 @@
+{
+  "_comment": "Default English phoneme inventory used by the new-bank flow when inventory_source is english-basic. Copy of the en-au-leo inventory. Examples are hints for the speaker and can be edited per bank.",
+  "phonemes": [
+    {
+      "id": "ai",
+      "ipa": "aɪ",
+      "example": "price",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "au",
+      "ipa": "aʊ",
+      "example": "mouth",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "b",
+      "ipa": "b",
+      "example": "bed",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "d",
+      "ipa": "d",
+      "example": "day",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "dzh",
+      "ipa": "dʒ",
+      "example": "judge",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "e",
+      "ipa": "e",
+      "example": "dress",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "e_schwa",
+      "ipa": "eə",
+      "example": "there",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "ey",
+      "ipa": "eɪ",
+      "example": "face",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "f",
+      "ipa": "f",
+      "example": "fish",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "g",
+      "ipa": "g",
+      "example": "go",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "h",
+      "ipa": "h",
+      "example": "house",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ee",
+      "ipa": "iː",
+      "example": "see",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "j",
+      "ipa": "j",
+      "example": "yes",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ju",
+      "ipa": "juː",
+      "example": "cute",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "k",
+      "ipa": "k",
+      "example": "kite",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "ks",
+      "ipa": "ks",
+      "example": "box",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "l",
+      "ipa": "l",
+      "example": "like",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "m",
+      "ipa": "m",
+      "example": "man",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "n",
+      "ipa": "n",
+      "example": "no",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ow",
+      "ipa": "oʊ",
+      "example": "goat",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "p",
+      "ipa": "p",
+      "example": "pen",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "r",
+      "ipa": "r",
+      "example": "red",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "s",
+      "ipa": "s",
+      "example": "see",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "t",
+      "ipa": "t",
+      "example": "ten",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "ch",
+      "ipa": "tʃ",
+      "example": "church",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "oo",
+      "ipa": "uː",
+      "example": "goose",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "v",
+      "ipa": "v",
+      "example": "very",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "w",
+      "ipa": "w",
+      "example": "we",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "z",
+      "ipa": "z",
+      "example": "zoo",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ae",
+      "ipa": "æ",
+      "example": "cat",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "th_vd",
+      "ipa": "ð",
+      "example": "this",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ng",
+      "ipa": "ŋ",
+      "example": "sing",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ah",
+      "ipa": "ɑː",
+      "example": "start",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "o_brit",
+      "ipa": "ɒ",
+      "example": "lot",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "oi",
+      "ipa": "ɔɪ",
+      "example": "choice",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "or_caught",
+      "ipa": "ɔː",
+      "example": "caught",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "e_near",
+      "ipa": "ɛə",
+      "example": "Mary",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "er",
+      "ipa": "ɜː",
+      "example": "nurse",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "ih",
+      "ipa": "ɪ",
+      "example": "kit",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "i_schwa",
+      "ipa": "ɪə",
+      "example": "near",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "sh",
+      "ipa": "ʃ",
+      "example": "ship",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "u_short",
+      "ipa": "ʊ",
+      "example": "foot",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "uh",
+      "ipa": "ʌ",
+      "example": "strut",
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "th_vl",
+      "ipa": "θ",
+      "example": "thin",
+      "loopable": true,
+      "category": "consonant"
+    }
+  ]
+}

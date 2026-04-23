@@ -25,7 +25,15 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
+from server.banks import (
+    BankIdExists,
+    BankInvalid,
+    BankNotFound,
+    CreateBankInvalid,
+    create_bank,
+    list_banks,
+    read_bank,
+)
 from server.export import ExportError, ExportSummary, export_bank
 from server.ffmpeg_util import FfmpegError
 from server.gitignore import GitignoreSyncFailed, sync as sync_gitignore
@@ -183,7 +191,9 @@ class AppRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 (stdlib naming)
         path = urlparse(self.path).path
         try:
-            if (match := TAKE_POST_RE.match(path)):
+            if path == "/api/banks":
+                self._create_bank()
+            elif (match := TAKE_POST_RE.match(path)):
                 bank_id, phoneme_id = match.groups()
                 self._create_take(bank_id, phoneme_id)
             elif (match := EXPORT_POST_RE.match(path)):
@@ -763,6 +773,71 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         self._send_json(
             HTTPStatus.OK,
             {"banks": list_banks(self.config.repo_root)},
+        )
+
+    def _create_bank(self) -> None:
+        length_header = self.headers.get("Content-Length")
+        if not length_header:
+            self._send_json(
+                HTTPStatus.LENGTH_REQUIRED,
+                {"error": "length_required", "message": "Content-Length header is required"},
+            )
+            return
+        try:
+            length = int(length_header)
+        except ValueError:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "invalid Content-Length"},
+            )
+            return
+        if length <= 0 or length > MAX_CONFIG_BYTES:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": f"body size {length} out of range"},
+            )
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError as exc:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_json", "message": str(exc)},
+            )
+            return
+        if not isinstance(payload, dict):
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "body must be a JSON object"},
+            )
+            return
+
+        try:
+            summary = create_bank(
+                repo_root=self.config.repo_root,
+                seeds_dir=self.config.repo_root / "server" / "seeds",
+                payload=payload,
+            )
+        except BankIdExists as exc:
+            self._send_json(
+                HTTPStatus.CONFLICT,
+                {
+                    "error": "bank_id_exists",
+                    "message": f"bank {exc.bank_id!r} already exists",
+                },
+            )
+            return
+        except CreateBankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": exc.code, "message": exc.message},
+            )
+            return
+
+        self._send_json(
+            HTTPStatus.CREATED,
+            {"bank": summary, "path": f"banks/{summary['id']}"},
         )
 
     def _read_bank(self, bank_id: str) -> None:
