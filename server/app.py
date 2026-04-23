@@ -16,6 +16,7 @@ if sys.version_info < (3, 10):
 
 import argparse
 import json
+import os
 import re
 import shutil
 from dataclasses import asdict, dataclass
@@ -27,6 +28,8 @@ from urllib.parse import parse_qs, urlparse
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
 from server.export import ExportError, ExportSummary, export_bank
 from server.ffmpeg_util import FfmpegError
+from server.gitignore import GitignoreSyncFailed, sync as sync_gitignore
+from server.schema import validate_config
 from server.references import (
     REFERENCE_SOURCES,
     ReferenceError,
@@ -69,6 +72,10 @@ TAKE_FILE_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)$"
 REFERENCE_GET_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/reference$")
 STATE_PUT_RE = re.compile(r"^/api/banks/([^/]+)/state$")
 EXPORT_POST_RE = re.compile(r"^/api/banks/([^/]+)/export$")
+CONFIG_PUT_RE = re.compile(r"^/api/banks/([^/]+)/config$")
+
+ALLOWED_CONFIG_UPDATE_FIELDS = frozenset({"privacy", "attribution", "confirm_flip"})
+MAX_CONFIG_BYTES = 64 * 1024
 
 
 @dataclass
@@ -157,9 +164,10 @@ class AppRequestHandler(BaseHTTPRequestHandler):
     def do_PUT(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
         try:
-            match = STATE_PUT_RE.match(path)
-            if match:
+            if (match := STATE_PUT_RE.match(path)):
                 self._put_state(match.group(1))
+            elif (match := CONFIG_PUT_RE.match(path)):
+                self._put_config(match.group(1))
             else:
                 self._send_json(
                     HTTPStatus.NOT_FOUND,
@@ -506,6 +514,167 @@ class AppRequestHandler(BaseHTTPRequestHandler):
 
         write_state(self.config.repo_root / "banks" / bank_id, new_state)
         self._send_json(HTTPStatus.OK, new_state)
+
+    def _put_config(self, bank_id: str) -> None:
+        try:
+            bank = read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        length_header = self.headers.get("Content-Length")
+        if not length_header:
+            self._send_json(
+                HTTPStatus.LENGTH_REQUIRED,
+                {"error": "length_required", "message": "Content-Length header is required"},
+            )
+            return
+        try:
+            length = int(length_header)
+        except ValueError:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "invalid Content-Length"},
+            )
+            return
+        if length <= 0 or length > MAX_CONFIG_BYTES:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": f"body size {length} out of range"},
+            )
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError as exc:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_json", "message": str(exc)},
+            )
+            return
+        if not isinstance(payload, dict):
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "body must be a JSON object"},
+            )
+            return
+
+        unknown = sorted(set(payload) - ALLOWED_CONFIG_UPDATE_FIELDS)
+        if unknown:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": "bad_request",
+                    "message": f"only privacy + attribution are mutable; unknown fields: {unknown}",
+                },
+            )
+            return
+
+        current_config = bank["config"]
+        current_privacy = current_config["privacy"]
+        new_privacy = payload.get("privacy", current_privacy)
+        confirm_flip = bool(payload.get("confirm_flip", False))
+
+        if new_privacy not in ("public", "private"):
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {
+                    "error": "invalid_privacy",
+                    "message": f"privacy must be 'public' or 'private', got {new_privacy!r}",
+                },
+            )
+            return
+
+        privacy_changed = new_privacy != current_privacy
+        if privacy_changed and not confirm_flip:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {
+                    "error": "confirm_required",
+                    "message": (
+                        f"changing privacy from {current_privacy!r} to {new_privacy!r} "
+                        "requires confirm_flip: true"
+                    ),
+                },
+            )
+            return
+
+        new_config = dict(current_config)
+        new_config["privacy"] = new_privacy
+
+        if "attribution" in payload:
+            attribution = payload["attribution"]
+            if attribution is None or (isinstance(attribution, str) and not attribution.strip()):
+                new_config.pop("attribution", None)
+            elif isinstance(attribution, str):
+                new_config["attribution"] = attribution.strip()
+            else:
+                self._send_json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "error": "invalid_attribution",
+                        "message": "attribution must be a string",
+                    },
+                )
+                return
+
+        if new_privacy == "public":
+            attribution = new_config.get("attribution")
+            if not isinstance(attribution, str) or not attribution.strip():
+                self._send_json(
+                    HTTPStatus.UNPROCESSABLE_ENTITY,
+                    {
+                        "error": "attribution_required",
+                        "message": "attribution is required and non-empty for a public bank",
+                    },
+                )
+                return
+
+        errors = validate_config(new_config)
+        if errors:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "config_invalid", "errors": errors},
+            )
+            return
+
+        # Write config atomically, then sync the per-bank .gitignore.
+        bank_path = self.config.repo_root / "banks" / bank_id
+        config_file = bank_path / "config.json"
+        tmp = config_file.with_name("config.json.tmp")
+        tmp.write_text(
+            json.dumps(new_config, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(tmp, config_file)
+
+        try:
+            gitignore_status = sync_gitignore(bank_path, new_privacy)
+        except GitignoreSyncFailed as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {
+                    "error": "gitignore_sync_failed",
+                    "message": exc.message,
+                    "hint": "config.json was updated; .gitignore could not be synced. "
+                            "Check bank directory permissions and retry via the Sync button.",
+                },
+            )
+            return
+
+        self._send_json(
+            HTTPStatus.OK,
+            {"config": new_config, "gitignore": asdict(gitignore_status)},
+        )
 
     def _serve_reference(self, bank_id: str, phoneme_id: str) -> None:
         try:
