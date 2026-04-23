@@ -1,0 +1,19 @@
+{
+  "name": "Aussie English — Leo",
+  "locale": "en-AU",
+  "speaker": "Leo Caseiro",
+  "privacy": "private",
+  "target_lufs": -16,
+  "phonemes": [
+    { "id": "sh",    "ipa": "ʃ",  "example": "ship", "loopable": true,  "category": "consonant" },
+    { "id": "th_vl", "ipa": "θ",  "example": "thin", "loopable": true,  "category": "consonant" },
+    { "id": "s",     "ipa": "s",  "example": "see",  "loopable": true,  "category": "consonant" },
+    { "id": "f",     "ipa": "f",  "example": "fish", "loopable": true,  "category": "consonant" },
+    { "id": "m",     "ipa": "m",  "example": "man",  "loopable": true,  "category": "consonant" },
+    { "id": "p",     "ipa": "p",  "example": "pen",  "loopable": false, "category": "consonant" },
+    { "id": "t",     "ipa": "t",  "example": "ten",  "loopable": false, "category": "consonant" },
+    { "id": "k",     "ipa": "k",  "example": "kite", "loopable": false, "category": "consonant" },
+    { "id": "ee",    "ipa": "iː", "example": "see",  "loopable": true,  "category": "vowel" },
+    { "id": "ah",    "ipa": "ɑː", "example": "car",  "loopable": true,  "category": "vowel" }
+  ]
+}
