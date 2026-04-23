@@ -3,20 +3,21 @@
 # file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """Reference-audio resolution.
 
-Order of attempts:
-  1. server/seeds/phoneme_reference_files.json → a file in references/
-     (Vocabulary.com MP3s, see
-     https://www.vocabulary.com/resources/ipa-pronunciation/) — checked
-     first so it wins over any older Wikimedia ogg
-  2. references/<phoneme_id>.<ext> ogg, then mp3
+Two bundled corpora (local files only, no TTS):
 
-Reference preview uses only local files (Wikimedia and/or
-Vocabulary.com–sourced MP3s). There is no synthesis fallback.
+- **PolyU** — Hong Kong PolyU ELC (
+  `references/polyu/*.mp3`, map `server/seeds/phoneme_polyu_files.json`
+  from https://elc.polyu.edu.hk/sounds/ — run
+  `python3 scripts/fetch_polyu_references.py`).
 
-The `references/` directory is gitignored. It may contain audio
-whose licence does not permit redistribution; by design those files
-never leave the user's machine and are read-only from the export
-pipeline (spec §11.3).
+- **Vocabulary.com** — `server/seeds/phoneme_reference_files.json`, files
+  under `references/`.
+
+`GET` supports `?source=auto` (default: PolyU if present, else
+Vocabulary), `polyu`, or `vocabulary`.
+
+The `references/` tree is gitignored. Audio may be licence-restricted;
+it stays on the user machine and is read-only in export (spec §11.3).
 """
 
 from __future__ import annotations
@@ -28,7 +29,6 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Prefer .ogg when both exist (Wikimedia fetches from fetch_references.py use .ogg).
 LOCAL_REFERENCE_EXTENSIONS = (
     ("ogg", "audio/ogg"),
     ("mp3", "audio/mpeg"),
@@ -39,8 +39,8 @@ LOCAL_REFERENCE_EXTENSIONS = (
 class ReferenceResponse:
     body: bytes
     content_type: str
-    source: str  # "wikimedia" | "vocabulary" | "file"
-    attribution: str | None  # non-None iff source == "wikimedia"
+    source: str
+    attribution: str | None
 
 
 class ReferenceError(Exception):
@@ -51,7 +51,7 @@ class ReferenceError(Exception):
 
 
 def load_ipa_espeak_map(seeds_dir: Path) -> dict[str, str]:
-    """Return the IPA→Kirshenbaum map from seeds (optional; not used for reference preview)."""
+    """Legacy IPA map (not used for HTTP reference preview)."""
     path = seeds_dir / "ipa_espeak_map.json"
     if not path.is_file():
         return {}
@@ -60,8 +60,19 @@ def load_ipa_espeak_map(seeds_dir: Path) -> dict[str, str]:
 
 
 def load_phoneme_reference_files(seeds_dir: Path) -> dict[str, str]:
-    """Return phoneme_id → filename in references/; empty if missing."""
     path = seeds_dir / "phoneme_reference_files.json"
+    if not path.is_file():
+        return {}
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    return {
+        k: v
+        for k, v in raw.items()
+        if isinstance(k, str) and not k.startswith("_") and isinstance(v, str) and v
+    }
+
+
+def load_phoneme_polyu_files(seeds_dir: Path) -> dict[str, str]:
+    path = seeds_dir / "phoneme_polyu_files.json"
     if not path.is_file():
         return {}
     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -76,11 +87,90 @@ def serve_reference(
     *,
     phoneme: dict,
     references_root: Path,
+    phoneme_polyu_files: dict[str, str],
     phoneme_reference_files: dict[str, str],
+    source: str,
     attribution_path: Path,
 ) -> ReferenceResponse:
-    phoneme_id = phoneme.get("id", "")
+    """Resolve one reference clip. ``source`` is auto | polyu | vocabulary."""
+    mode = (source or "auto").strip().lower()
+    if mode not in ("auto", "polyu", "vocabulary"):
+        mode = "auto"
 
+    phoneme_id = phoneme.get("id", "")
+    ipa = phoneme.get("ipa", "")
+
+    if mode == "vocabulary":
+        r = _try_vocabulary(
+            references_root, phoneme_id, phoneme_reference_files, attribution_path
+        )
+        if r is not None:
+            return r
+        raise ReferenceError(
+            "reference_missing",
+            f"no Vocabulary.com–mapped file for {phoneme_id!r} (IPA {ipa!r}) under {references_root}.",
+        )
+
+    if mode == "polyu":
+        r = _try_polyu(references_root, phoneme_id, phoneme_polyu_files)
+        if r is not None:
+            return r
+        raise ReferenceError(
+            "reference_missing",
+            (
+                f"no PolyU clip for {phoneme_id!r} (IPA {ipa!r}). "
+                f"Run: python3 scripts/fetch_polyu_references.py "
+                f"— files go under {references_root / 'polyu'}."
+            ),
+        )
+
+    # auto: PolyU first, then Vocabulary
+    r = _try_polyu(references_root, phoneme_id, phoneme_polyu_files)
+    if r is not None:
+        return r
+    r = _try_vocabulary(
+        references_root, phoneme_id, phoneme_reference_files, attribution_path
+    )
+    if r is not None:
+        return r
+    raise ReferenceError(
+        "reference_missing",
+        (
+            f"no reference audio for {phoneme_id!r} (IPA {ipa!r}). "
+            f"Try: python3 scripts/fetch_polyu_references.py "
+            f"and/or Vocabulary.com files per server/seeds/phoneme_reference_files.json."
+        ),
+    )
+
+
+def _try_polyu(
+    references_root: Path, phoneme_id: str, polyu: dict[str, str]
+) -> ReferenceResponse | None:
+    name = polyu.get(phoneme_id)
+    if not name:
+        return None
+    path = references_root / "polyu" / name
+    if not path.is_file():
+        return None
+    ext = path.suffix.lower().lstrip(".")
+    content_type = {
+        "mp3": "audio/mpeg",
+        "ogg": "audio/ogg",
+    }.get(ext, "application/octet-stream")
+    return ReferenceResponse(
+        body=path.read_bytes(),
+        content_type=content_type,
+        source="polyu",
+        attribution=None,
+    )
+
+
+def _try_vocabulary(
+    references_root: Path,
+    phoneme_id: str,
+    phoneme_reference_files: dict[str, str],
+    attribution_path: Path,
+) -> ReferenceResponse | None:
     alt = phoneme_reference_files.get(phoneme_id)
     if alt:
         path = references_root / alt
@@ -109,27 +199,10 @@ def serve_reference(
                     read_attribution(attribution_path, phoneme_id) if wikimedia else None
                 ),
             )
-
-    ipa = phoneme.get("ipa", "")
-    raise ReferenceError(
-        "reference_missing",
-        (
-            f"no reference audio for phoneme_id {phoneme_id!r} (IPA {ipa!r}). "
-            f"Place a file under {references_root}/ or add a row to "
-            f"server/seeds/phoneme_reference_files.json. "
-            f"Clips from https://www.vocabulary.com/resources/ipa-pronunciation/ "
-            f"can be saved there (see seed map for filenames)."
-        ),
-    )
+    return None
 
 
 def read_attribution(attribution_path: Path, phoneme_id: str) -> str | None:
-    """Parse one attribution line out of ATTRIBUTION.md.
-
-    Lines written by fetch_references.py follow the format:
-        - <phoneme_id>: <uploader> / <licence> / <commons_page>
-    Anything else is ignored.
-    """
     if not attribution_path.is_file():
         return None
     prefix = f"- {phoneme_id}: "
@@ -140,3 +213,20 @@ def read_attribution(attribution_path: Path, phoneme_id: str) -> str | None:
     except OSError as exc:
         logger.warning("failed to read %s: %s", attribution_path, exc)
     return None
+
+
+# Catalog for the UI and OpenAPI–style clients.
+REFERENCE_SOURCES: tuple[tuple[str, str], ...] = (
+    (
+        "auto",
+        "Auto — PolyU ELC (HK) if downloaded, else Vocabulary.com",
+    ),
+    (
+        "polyu",
+        "PolyU ELC (https://elc.polyu.edu.hk/sounds/)",
+    ),
+    (
+        "vocabulary",
+        "Vocabulary.com (see server/seeds/phoneme_reference_files.json)",
+    ),
+)

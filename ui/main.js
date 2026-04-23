@@ -8,6 +8,7 @@ import {
   getBanks,
   getHealth,
   getReference,
+  getReferenceSources,
   getTakeWav,
   postTake,
   putState,
@@ -37,6 +38,14 @@ const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
 const METER_CLIP_THRESHOLD_DB = -1;
 
+const DEFAULT_REFERENCE_SOURCES = [
+  { id: "auto", label: "Auto — PolyU if present, else Vocabulary.com" },
+  { id: "polyu", label: "PolyU ELC (HK)" },
+  { id: "vocabulary", label: "Vocabulary.com" },
+];
+
+let referenceSourceList = DEFAULT_REFERENCE_SOURCES;
+
 let currentBank = null;
 let selectedPhonemeId = null;
 let selectedTakeId = null;
@@ -52,12 +61,23 @@ const toastElement = ensureToast();
 
 async function init() {
   renderHealth(await safeGetHealth());
+  try {
+    const { sources } = await getReferenceSources();
+    if (Array.isArray(sources) && sources.length > 0) referenceSourceList = sources;
+  } catch {
+    // keep default list
+  }
   await loadBanks();
   window.addEventListener("keydown", handleKeyDown);
   bankSelect.addEventListener("change", () => loadBank(bankSelect.value));
   micGrantButton.addEventListener("click", grantMicAndStartMeter);
   recordButton.addEventListener("click", toggleRecording);
   phonemeDetail.addEventListener("click", handleDetailClick);
+  phonemeDetail.addEventListener("change", (e) => {
+    if (e.target?.id === "ref-source") {
+      localStorage.setItem("reference_source", e.target.value);
+    }
+  });
 }
 
 async function safeGetHealth() {
@@ -85,7 +105,7 @@ function renderHealth(body) {
 
   const missing = [];
   if (!body.tools?.ffmpeg) missing.push("ffmpeg");
-  if (!body.tools?.espeak_ng) missing.push("espeak-ng");
+  // espeak-ng is optional (reference is file-based)
 
   if (missing.length === 0) {
     banner.classList.add("health-banner--ready");
@@ -230,13 +250,25 @@ function renderDetail(phoneme) {
   const phonemeState = currentBank?.state?.phonemes?.[phoneme.id] ?? {};
   const takes = phonemeState.takes ?? [];
   const keeperTakeId = phonemeState.keeper_take ?? null;
+  const storedRef = localStorage.getItem("reference_source") || "auto";
+  const refOpts = referenceSourceList
+    .map((s) => {
+      const sel = s.id === storedRef ? " selected" : "";
+      return `<option value="${escapeHtml(s.id)}"${sel}>${escapeHtml(s.label)}</option>`;
+    })
+    .join("");
   phonemeDetail.innerHTML = `
     <div class="phoneme-detail__header">
       <span class="phoneme-detail__ipa">${escapeHtml(phoneme.ipa)}</span>
       <span class="phoneme-detail__example">${escapeHtml(phoneme.example ?? "")}</span>
-      <button class="reference-btn" data-action="play-reference" type="button" aria-label="Play reference audio (G)">
-        ▶ Reference <kbd>G</kbd>
-      </button>
+      <div class="reference-controls">
+        <label class="ref-source-label">Reference
+          <select id="ref-source" class="ref-source" aria-label="Reference clip source">${refOpts}</select>
+        </label>
+        <button class="reference-btn" data-action="play-reference" type="button" aria-label="Play reference audio (G)">
+          ▶ <kbd>G</kbd>
+        </button>
+      </div>
     </div>
     <p id="reference-attribution" class="reference-attribution" hidden></p>
     <dl class="phoneme-detail__meta">
@@ -375,16 +407,18 @@ async function playReference() {
   if (!selectedPhonemeId) return;
   const bankId = bankSelect.value;
   const phonemeId = selectedPhonemeId;
+  const refSourceEl = document.getElementById("ref-source");
+  const refSource = refSourceEl ? refSourceEl.value : "auto";
   const attributionEl = document.getElementById("reference-attribution");
   if (attributionEl) attributionEl.hidden = true;
 
   let payload;
   try {
-    payload = await getReference(bankId, phonemeId);
+    payload = await getReference(bankId, phonemeId, { source: refSource });
   } catch (err) {
     const code = err.body?.error ?? "";
-    if (code === "espeak_no_mapping") {
-      showToast("No reference available for this phoneme", "error");
+    if (code === "reference_missing") {
+      showToast("No reference clip (run fetch scripts or try another source)", "error");
     } else {
       showToast(`Reference failed: ${err.message}`, "error");
     }

@@ -22,11 +22,13 @@ from dataclasses import asdict, dataclass
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
 from server.references import (
+    REFERENCE_SOURCES,
     ReferenceError,
+    load_phoneme_polyu_files,
     load_phoneme_reference_files,
     serve_reference,
 )
@@ -72,6 +74,7 @@ class ServerConfig:
     port: int
     ffmpeg: Path | None
     espeak: Path | None
+    phoneme_polyu_files: dict[str, str]
     phoneme_reference_files: dict[str, str]
 
 
@@ -95,6 +98,8 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/health":
                 self._send_health()
+            elif path == "/api/reference-sources":
+                self._send_reference_sources()
             elif path == "/api/banks":
                 self._list_banks()
             elif (match := TAKE_FILE_RE.match(path)):
@@ -453,11 +458,16 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         refs_root = self.config.repo_root / "references"
         attribution_path = refs_root / "ATTRIBUTION.md"
 
+        parsed = parse_qs(urlparse(self.path).query)
+        source = (parsed.get("source") or ["auto"])[0]
+
         try:
             response = serve_reference(
                 phoneme=phoneme,
                 references_root=refs_root,
+                phoneme_polyu_files=self.config.phoneme_polyu_files,
                 phoneme_reference_files=self.config.phoneme_reference_files,
+                source=source,
                 attribution_path=attribution_path,
             )
         except ReferenceError as exc:
@@ -487,6 +497,16 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             "version": VERSION,
         }
         self._send_json(HTTPStatus.OK, payload)
+
+    def _send_reference_sources(self) -> None:
+        self._send_json(
+            HTTPStatus.OK,
+            {
+                "sources": [
+                    {"id": sid, "label": label} for sid, label in REFERENCE_SOURCES
+                ],
+            },
+        )
 
     def _list_banks(self) -> None:
         self._send_json(
@@ -574,12 +594,14 @@ def parse_args(argv: list[str] | None = None) -> ServerConfig:
     args = parser.parse_args(argv)
     ffmpeg, espeak = probe_tools()
     seeds = args.repo_root / "server" / "seeds"
+    phoneme_polyu_files = load_phoneme_polyu_files(seeds)
     phoneme_reference_files = load_phoneme_reference_files(seeds)
     return ServerConfig(
         repo_root=args.repo_root,
         port=args.port,
         ffmpeg=ffmpeg,
         espeak=espeak,
+        phoneme_polyu_files=phoneme_polyu_files,
         phoneme_reference_files=phoneme_reference_files,
     )
 

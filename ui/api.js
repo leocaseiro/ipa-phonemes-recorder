@@ -32,9 +32,18 @@ export async function getBank(id) {
   return fetchJson(`/api/banks/${encodeURIComponent(id)}`);
 }
 
-export async function getReference(bankId, phonemeId) {
+export async function getReferenceSources() {
+  return fetchJson("/api/reference-sources");
+}
+
+export async function getReference(bankId, phonemeId, options = {}) {
+  const source = options.source ?? "auto";
+  const q = new URLSearchParams();
+  if (source && source !== "auto") q.set("source", source);
+  const qs = q.toString();
+  const suffix = qs ? `?${qs}` : "";
   const response = await fetch(
-    `/api/banks/${encodeURIComponent(bankId)}/phonemes/${encodeURIComponent(phonemeId)}/reference`,
+    `/api/banks/${encodeURIComponent(bankId)}/phonemes/${encodeURIComponent(phonemeId)}/reference${suffix}`,
   );
   if (!response.ok) {
     let body = null;

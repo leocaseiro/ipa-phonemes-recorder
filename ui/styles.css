@@ -209,10 +209,48 @@ body {
   gap: 20px;
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+
+.reference-controls {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.ref-source-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ref-source {
+  min-width: 12rem;
+  max-width: 20rem;
+  padding: 4px 8px;
+  background: var(--bg-inset);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 12px;
+  text-transform: none;
+  letter-spacing: normal;
+  cursor: pointer;
+}
+
+.ref-source:focus {
+  outline: 1px solid var(--accent);
 }
 
 .reference-btn {
-  margin-left: auto;
+  margin-left: 0;
   padding: 6px 12px;
   background: var(--bg-inset);
   color: var(--fg);
