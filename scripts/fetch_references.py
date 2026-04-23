@@ -52,18 +52,75 @@ class ReferenceEntry:
     commons_page: str   # https://commons.wikimedia.org/wiki/File:...
 
 
-# The table starts empty on purpose. The tool runs fine without it
-# (the server falls back to espeak-ng synthesis); curating URLs is a
-# gradual job. Add entries as needed.
+# Curated references for the seed en-au-leo bank's 10 phonemes.
+#
+# Vowel files are the short cardinals (/i/, /ɑ/) — Wikipedia does not
+# distinguish length on the vowel chart with audio, but the quality
+# matches the long English variants the speaker is matching to.
+#
+# Add new entries as new phonemes are added to banks. Phonemes with
+# no entry here fall back to espeak-ng synthesis at request time.
 WIKIMEDIA_REFERENCES: list[ReferenceEntry] = [
-    # ReferenceEntry(
-    #     phoneme_id="sh",
-    #     ipa="ʃ",
-    #     url="https://upload.wikimedia.org/.../Voiceless_postalveolar_fricative.ogg",
-    #     licence="CC BY-SA 3.0",
-    #     uploader="Peter238",
-    #     commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_postalveolar_fricative.ogg",
-    # ),
+    ReferenceEntry(
+        phoneme_id="sh", ipa="ʃ",
+        url="https://upload.wikimedia.org/wikipedia/commons/c/cc/Voiceless_palato-alveolar_sibilant.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_palato-alveolar_sibilant.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="th_vl", ipa="θ",
+        url="https://upload.wikimedia.org/wikipedia/commons/8/80/Voiceless_dental_fricative.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_dental_fricative.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="s", ipa="s",
+        url="https://upload.wikimedia.org/wikipedia/commons/a/ac/Voiceless_alveolar_sibilant.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_alveolar_sibilant.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="f", ipa="f",
+        url="https://upload.wikimedia.org/wikipedia/commons/c/c7/Voiceless_labio-dental_fricative.ogg",
+        licence="CC0 1.0", uploader="Nixinova",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_labio-dental_fricative.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="m", ipa="m",
+        url="https://upload.wikimedia.org/wikipedia/commons/a/a9/Bilabial_nasal.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Bilabial_nasal.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="p", ipa="p",
+        url="https://upload.wikimedia.org/wikipedia/commons/5/51/Voiceless_bilabial_plosive.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_bilabial_plosive.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="t", ipa="t",
+        url="https://upload.wikimedia.org/wikipedia/commons/0/02/Voiceless_alveolar_plosive.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_alveolar_plosive.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="k", ipa="k",
+        url="https://upload.wikimedia.org/wikipedia/commons/e/e3/Voiceless_velar_plosive.ogg",
+        licence="CC BY-SA 3.0", uploader="Peter Isotalo",
+        commons_page="https://commons.wikimedia.org/wiki/File:Voiceless_velar_plosive.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="ee", ipa="iː",
+        url="https://upload.wikimedia.org/wikipedia/commons/9/91/Close_front_unrounded_vowel.ogg",
+        licence="CC BY-SA 3.0", uploader="Denelson83",
+        commons_page="https://commons.wikimedia.org/wiki/File:Close_front_unrounded_vowel.ogg",
+    ),
+    ReferenceEntry(
+        phoneme_id="ah", ipa="ɑː",
+        url="https://upload.wikimedia.org/wikipedia/commons/e/e5/Open_back_unrounded_vowel.ogg",
+        licence="CC BY-SA 3.0", uploader="Denelson83",
+        commons_page="https://commons.wikimedia.org/wiki/File:Open_back_unrounded_vowel.ogg",
+    ),
 ]
 
 
