@@ -297,17 +297,25 @@ function renderEmpty(message) {
 function handleKeyDown(event) {
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+  // Delete-confirm acts as a modal: only Enter confirms and Escape cancels;
+  // every other shortcut is ignored until the user resolves it.
+  if (pendingDeleteTakeId) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      doDelete(pendingDeleteTakeId);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      hideDeleteConfirm();
+    }
+    return;
+  }
+
   if (
     tag === "BUTTON" &&
     (event.key === "Enter" || event.key === " " || event.key === "Backspace")
   ) {
     // Let the focused button handle these keys natively.
-    return;
-  }
-
-  if (event.key === "Escape" && pendingDeleteTakeId) {
-    event.preventDefault();
-    hideDeleteConfirm();
     return;
   }
 
@@ -484,6 +492,14 @@ function handleDetailClick(event) {
   const actionEl = event.target.closest("[data-action]");
   const action = actionEl?.dataset.action;
 
+  // Delete-confirm modality: only its own buttons do anything; clicks
+  // anywhere else just close the confirm.
+  if (pendingDeleteTakeId) {
+    if (action === "confirm-delete") doDelete(pendingDeleteTakeId);
+    else hideDeleteConfirm();
+    return;
+  }
+
   if (action === "play") {
     togglePlay(takeId);
     return;
@@ -494,14 +510,6 @@ function handleDetailClick(event) {
   }
   if (action === "delete") {
     showDeleteConfirm(takeId);
-    return;
-  }
-  if (action === "confirm-delete") {
-    doDelete(takeId);
-    return;
-  }
-  if (action === "cancel-delete") {
-    hideDeleteConfirm();
     return;
   }
   // Row body click → select the take.
