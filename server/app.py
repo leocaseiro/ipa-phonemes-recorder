@@ -25,6 +25,8 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from server.banks import BankInvalid, BankNotFound, list_banks, read_bank
+from server.export import ExportError, ExportSummary, export_bank
+from server.ffmpeg_util import FfmpegError
 from server.references import (
     REFERENCE_SOURCES,
     ReferenceError,
@@ -66,6 +68,7 @@ TAKE_POST_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes$")
 TAKE_FILE_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)$")
 REFERENCE_GET_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/reference$")
 STATE_PUT_RE = re.compile(r"^/api/banks/([^/]+)/state$")
+EXPORT_POST_RE = re.compile(r"^/api/banks/([^/]+)/export$")
 
 
 @dataclass
@@ -172,10 +175,11 @@ class AppRequestHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:  # noqa: N802 (stdlib naming)
         path = urlparse(self.path).path
         try:
-            match = TAKE_POST_RE.match(path)
-            if match:
+            if (match := TAKE_POST_RE.match(path)):
                 bank_id, phoneme_id = match.groups()
                 self._create_take(bank_id, phoneme_id)
+            elif (match := EXPORT_POST_RE.match(path)):
+                self._export_bank(match.group(1))
             else:
                 self._send_json(
                     HTTPStatus.NOT_FOUND,
@@ -296,6 +300,84 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(HTTPStatus.CREATED, asdict(meta))
+
+    def _export_bank(self, bank_id: str) -> None:
+        try:
+            bank = read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        if self.config.ffmpeg is None:
+            self._send_json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "ffmpeg_unavailable",
+                    "message": "ffmpeg not found on PATH; install via brew install ffmpeg",
+                },
+            )
+            return
+
+        on_missing_keeper = "skip"
+        length_header = self.headers.get("Content-Length")
+        if length_header:
+            try:
+                length = int(length_header)
+            except ValueError:
+                length = 0
+            if 0 < length <= 64 * 1024:
+                body = self.rfile.read(length)
+                try:
+                    payload = json.loads(body)
+                except json.JSONDecodeError as exc:
+                    self._send_json(
+                        HTTPStatus.BAD_REQUEST,
+                        {"error": "bad_json", "message": str(exc)},
+                    )
+                    return
+                if isinstance(payload, dict) and "on_missing_keeper" in payload:
+                    on_missing_keeper = payload["on_missing_keeper"]
+
+        try:
+            summary: ExportSummary = export_bank(
+                bank_path=self.config.repo_root / "banks" / bank_id,
+                config=bank["config"],
+                state=bank["state"],
+                ffmpeg=self.config.ffmpeg,
+                tmp_root=self.config.repo_root / "tmp",
+                on_missing_keeper=on_missing_keeper,
+            )
+        except ExportError as exc:
+            status = HTTPStatus.BAD_REQUEST
+            if exc.code == "bad_request":
+                status = HTTPStatus.BAD_REQUEST
+            body = {"error": exc.code, "message": exc.message}
+            if exc.detail:
+                body["detail"] = exc.detail
+            body.update(exc.extra)
+            self._send_json(status, body)
+            return
+        except FfmpegError as exc:
+            self._send_json(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {
+                    "error": "ffmpeg_failed",
+                    "message": exc.message,
+                    "detail": exc.stderr,
+                },
+            )
+            return
+
+        self._send_json(HTTPStatus.OK, asdict(summary))
 
     def _serve_take_wav(self, bank_id: str, phoneme_id: str, take_id: str) -> None:
         try:

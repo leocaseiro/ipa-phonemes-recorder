@@ -80,7 +80,6 @@ def export_bank(
         raise ExportError(
             "missing_keepers",
             f"{len(skipped)} phoneme(s) without a keeper take",
-            detail=json.dumps(skipped, ensure_ascii=False),
             skipped=skipped,
         )
 
