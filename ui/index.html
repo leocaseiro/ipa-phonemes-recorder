@@ -14,8 +14,17 @@
   <body>
     <header class="topbar">
       <h1 class="title">IPA Phonemes Recorder</h1>
-      <div id="health-banner" class="health-banner health-banner--unknown">
-        Checking tools…
+      <div class="topbar-controls">
+        <label class="bank-select-label">
+          Bank
+          <select id="bank-select" class="bank-select" disabled>
+            <option>Loading…</option>
+          </select>
+        </label>
+        <span id="privacy-badge" class="privacy-badge privacy-badge--unknown" hidden></span>
+        <div id="health-banner" class="health-banner health-banner--unknown">
+          Checking tools…
+        </div>
       </div>
     </header>
 
