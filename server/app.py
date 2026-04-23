@@ -25,6 +25,13 @@ from pathlib import Path
 VERSION = "0.1.0"
 DEFAULT_PORT = 8766
 
+STATIC_CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".map": "application/json",
+}
+
 
 @dataclass
 class ServerConfig:
@@ -53,6 +60,10 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         try:
             if self.path == "/api/health":
                 self._send_health()
+            elif self.path == "/":
+                self._serve_static("index.html")
+            elif self.path.startswith("/ui/"):
+                self._serve_static(self.path.removeprefix("/ui/"))
             else:
                 self._send_json(
                     HTTPStatus.NOT_FOUND,
@@ -75,6 +86,38 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             "version": VERSION,
         }
         self._send_json(HTTPStatus.OK, payload)
+
+    def _serve_static(self, rel: str) -> None:
+        ext = Path(rel).suffix
+        if ext not in STATIC_CONTENT_TYPES:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"Unsupported static extension: {ext!r}"},
+            )
+            return
+
+        ui_root = (self.config.repo_root / "ui").resolve()
+        target = (ui_root / rel).resolve()
+        if not target.is_relative_to(ui_root):
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_path", "message": "Path escapes ui root"},
+            )
+            return
+        if not target.is_file():
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"No such file: {rel}"},
+            )
+            return
+
+        body = target.read_bytes()
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Content-Type", STATIC_CONTENT_TYPES[ext])
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
 
     def _send_json(self, status: HTTPStatus, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")

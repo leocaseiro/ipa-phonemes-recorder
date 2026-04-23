@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<!--
+  This Source Code Form is subject to the terms of the Mozilla Public
+  License, v. 2.0. If a copy of the MPL was not distributed with this
+  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>IPA Phonemes Recorder</title>
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 class="title">IPA Phonemes Recorder</h1>
+      <div id="health-banner" class="health-banner health-banner--unknown">
+        Checking tools…
+      </div>
+    </header>
+
+    <aside class="left-panel" aria-label="Phoneme list">
+      <ul id="phoneme-list" class="phoneme-list"></ul>
+    </aside>
+
+    <section id="phoneme-detail" class="centre-panel" aria-label="Phoneme detail">
+      <p class="placeholder">Select a phoneme to begin.</p>
+    </section>
+
+    <footer class="bottom-zone">
+      <div id="meter" class="meter" aria-label="Microphone level"></div>
+      <button id="record" class="record-button" type="button" disabled>
+        Record
+      </button>
+    </footer>
+
+    <script type="module" src="/ui/main.js"></script>
+  </body>
+</html>

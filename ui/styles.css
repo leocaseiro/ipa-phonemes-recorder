@@ -1,0 +1,148 @@
+/*
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/.
+ */
+
+:root {
+  --bg: #14161a;
+  --bg-raised: #1c1f25;
+  --bg-inset: #0f1114;
+  --fg: #e6e8ec;
+  --fg-muted: #8b929d;
+  --accent: #6aa9ff;
+  --good: #3fb37f;
+  --warn: #d08a3a;
+  --bad: #d64f4f;
+  --border: #262a31;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "topbar topbar"
+    "left   centre"
+    "bottom bottom";
+  height: 100vh;
+}
+
+.topbar {
+  grid-area: topbar;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  background: var(--bg-raised);
+  border-bottom: 1px solid var(--border);
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.health-banner {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.health-banner--unknown {
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+}
+
+.health-banner--ready {
+  background: color-mix(in oklab, var(--good) 18%, transparent);
+  color: var(--good);
+}
+
+.health-banner--missing {
+  background: color-mix(in oklab, var(--bad) 18%, transparent);
+  color: var(--bad);
+}
+
+.left-panel {
+  grid-area: left;
+  overflow-y: auto;
+  padding: 12px;
+  background: var(--bg-raised);
+  border-right: 1px solid var(--border);
+}
+
+.phoneme-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.centre-panel {
+  grid-area: centre;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.placeholder {
+  color: var(--fg-muted);
+  font-style: italic;
+}
+
+.bottom-zone {
+  grid-area: bottom;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px 20px;
+  background: var(--bg-raised);
+  border-top: 1px solid var(--border);
+}
+
+.meter {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-inset);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.record-button {
+  min-width: 120px;
+  height: 40px;
+  padding: 0 20px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bad);
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.record-button:disabled {
+  background: var(--bg-inset);
+  color: var(--fg-muted);
+  cursor: not-allowed;
+}
