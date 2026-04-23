@@ -21,7 +21,7 @@
             <option>Loading…</option>
           </select>
         </label>
-        <span id="privacy-badge" class="privacy-badge privacy-badge--unknown" hidden></span>
+        <button id="privacy-badge" type="button" class="privacy-badge privacy-badge--unknown" hidden></button>
         <button id="export-button" class="export-button" type="button">
           Export <kbd>E</kbd>
         </button>
@@ -52,9 +52,33 @@
       <ul id="phoneme-list" class="phoneme-list"></ul>
     </aside>
 
-    <section id="phoneme-detail" class="centre-panel" aria-label="Phoneme detail">
-      <p class="placeholder">Select a phoneme to begin.</p>
-    </section>
+    <main class="centre-column">
+      <div
+        id="gitignore-banner"
+        class="gitignore-banner"
+        role="alert"
+        hidden
+      ></div>
+      <section id="phoneme-detail" class="centre-panel" aria-label="Phoneme detail">
+        <p class="placeholder">Select a phoneme to begin.</p>
+      </section>
+    </main>
+
+    <div
+      id="privacy-modal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="privacy-modal-title"
+      hidden
+    >
+      <div class="modal__backdrop" data-action="close-privacy-modal"></div>
+      <div class="modal__card">
+        <h2 id="privacy-modal-title" class="modal__title"></h2>
+        <div id="privacy-modal-body" class="modal__body"></div>
+        <div id="privacy-modal-actions" class="modal__actions"></div>
+      </div>
+    </div>
 
     <footer class="bottom-zone">
       <div class="bottom-zone__row">

@@ -12,6 +12,7 @@ import {
   getTakeWav,
   postExport,
   postTake,
+  putConfig,
   putState,
 } from "/ui/api.js";
 import {
@@ -37,6 +38,11 @@ const meterCanvas = document.getElementById("meter-canvas");
 const exportButton = document.getElementById("export-button");
 const exportModal = document.getElementById("export-modal");
 const exportModalBody = document.getElementById("export-modal-body");
+const gitignoreBanner = document.getElementById("gitignore-banner");
+const privacyModal = document.getElementById("privacy-modal");
+const privacyModalTitle = document.getElementById("privacy-modal-title");
+const privacyModalBody = document.getElementById("privacy-modal-body");
+const privacyModalActions = document.getElementById("privacy-modal-actions");
 
 const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
@@ -81,6 +87,9 @@ async function init() {
   exportModal.addEventListener("click", (event) => {
     if (event.target?.dataset?.action === "close-modal") closeExportModal();
   });
+  privacyBadge.addEventListener("click", openPrivacyFlipModal);
+  privacyModal.addEventListener("click", handlePrivacyModalClick);
+  gitignoreBanner.addEventListener("click", handleGitignoreBannerClick);
   phonemeDetail.addEventListener("change", (e) => {
     if (e.target?.id === "ref-source") {
       localStorage.setItem("reference_source", e.target.value);
@@ -155,6 +164,7 @@ async function loadBank(id) {
     currentBank = bank;
     localStorage.setItem("last_bank_id", id);
     renderPrivacyBadge(bank.config.privacy);
+    renderGitignoreBanner(bank.gitignore);
     renderPhonemeList(bank);
     const firstId = bank.config.phonemes[0]?.id ?? null;
     const lastPhonemeId = bank.state.last_phoneme_id;
@@ -165,6 +175,48 @@ async function loadBank(id) {
   } catch (err) {
     currentBank = null;
     renderEmpty(`Failed to load bank ${id}: ${err.message}`);
+  }
+}
+
+function renderGitignoreBanner(status) {
+  if (!status || status.status === "ok") {
+    gitignoreBanner.hidden = true;
+    gitignoreBanner.textContent = "";
+    return;
+  }
+  const label =
+    status.status === "missing"
+      ? "Missing per-bank <code>.gitignore</code>"
+      : "<code>.gitignore</code> drift detected";
+  gitignoreBanner.hidden = false;
+  gitignoreBanner.innerHTML = `
+    <div class="gitignore-banner__text">
+      <strong>${label}</strong>
+      <p>Expected: <code>${escapeHtml(status.expected || "(empty)")}</code></p>
+      <p>Current: <code>${escapeHtml(status.current || "(absent)")}</code></p>
+    </div>
+    <button type="button" class="gitignore-banner__sync" data-action="sync-gitignore">
+      Sync
+    </button>
+  `;
+}
+
+async function handleGitignoreBannerClick(event) {
+  if (event.target?.dataset?.action !== "sync-gitignore") return;
+  if (!currentBank) return;
+  const bankId = bankSelect.value;
+  event.target.disabled = true;
+  event.target.textContent = "Syncing…";
+  try {
+    const updated = await putConfig(bankId, {});
+    currentBank.config = updated.config;
+    currentBank.gitignore = updated.gitignore;
+    renderGitignoreBanner(updated.gitignore);
+    showToast("Synced .gitignore", "success");
+  } catch (err) {
+    event.target.disabled = false;
+    event.target.textContent = "Sync";
+    showToast(`Sync failed: ${err.message}`, "error");
   }
 }
 
@@ -353,6 +405,17 @@ function handleKeyDown(event) {
     return;
   }
 
+  // Privacy flip modal — Escape closes; all other shortcuts suppressed.
+  // Typing inside the attribution textbox is already handled by the
+  // INPUT short-circuit above.
+  if (!privacyModal.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closePrivacyModal();
+    }
+    return;
+  }
+
   // Delete-confirm acts as a modal: only Enter confirms and Escape cancels;
   // every other shortcut is ignored until the user resolves it.
   if (pendingDeleteTakeId) {
@@ -514,6 +577,143 @@ function openExportModal({ pending, summary, error, bankId }) {
 function closeExportModal() {
   exportModal.hidden = true;
   document.body.classList.remove("modal-open");
+}
+
+function openPrivacyFlipModal() {
+  if (!currentBank) return;
+  const current = currentBank.config.privacy;
+  const target = current === "private" ? "public" : "private";
+  privacyModal.hidden = false;
+  document.body.classList.add("modal-open");
+  if (target === "public") {
+    renderFlipToPublic();
+  } else {
+    renderFlipToPrivate();
+  }
+}
+
+function renderFlipToPublic() {
+  const currentAttribution = currentBank?.config?.attribution ?? "";
+  privacyModalTitle.textContent = "Flip bank to public?";
+  privacyModalBody.innerHTML = `
+    <p class="privacy-modal__warn">
+      Voice is biometric data, and <strong>CC-BY-4.0 is effectively irrevocable</strong>
+      once published. For minor speakers, keep the bank private unless you have
+      long-term informed consent from the guardian.
+    </p>
+    <p>Public banks commit <code>dist/</code> to git; the per-bank
+      <code>.gitignore</code> will be emptied.</p>
+    <label class="privacy-modal__label">
+      Attribution string (required)
+      <input
+        id="privacy-modal-attribution"
+        type="text"
+        class="privacy-modal__input"
+        value="${escapeHtml(currentAttribution)}"
+        placeholder="e.g. Leo Caseiro, CC BY 4.0"
+        autocomplete="off"
+      />
+    </label>
+    <label class="privacy-modal__consent">
+      <input id="privacy-modal-consent" type="checkbox" />
+      I confirm informed consent from the speaker (and guardian, if a minor).
+    </label>
+  `;
+  privacyModalActions.innerHTML = `
+    <button type="button" class="modal__btn" data-action="close-privacy-modal">Cancel</button>
+    <button type="button" class="modal__btn modal__btn--primary" data-action="flip-to-public" disabled>
+      Flip to public
+    </button>
+  `;
+
+  const consent = privacyModal.querySelector("#privacy-modal-consent");
+  const attribution = privacyModal.querySelector("#privacy-modal-attribution");
+  const submit = privacyModal.querySelector('[data-action="flip-to-public"]');
+  const syncEnabled = () => {
+    submit.disabled = !consent.checked || !attribution.value.trim();
+  };
+  consent.addEventListener("change", syncEnabled);
+  attribution.addEventListener("input", syncEnabled);
+  attribution.focus();
+}
+
+function renderFlipToPrivate() {
+  privacyModalTitle.textContent = "Make bank private?";
+  privacyModalBody.innerHTML = `
+    <p>Future exports will not be committed to git — the per-bank
+      <code>.gitignore</code> will be rewritten to <code>dist/</code>.</p>
+    <p class="privacy-modal__note">Recordings already committed while the bank was
+      public remain in git history; removing them from history is a manual step.</p>
+  `;
+  privacyModalActions.innerHTML = `
+    <button type="button" class="modal__btn" data-action="close-privacy-modal">Cancel</button>
+    <button type="button" class="modal__btn modal__btn--primary" data-action="flip-to-private">
+      Make private
+    </button>
+  `;
+}
+
+function closePrivacyModal() {
+  privacyModal.hidden = true;
+  privacyModalBody.innerHTML = "";
+  privacyModalActions.innerHTML = "";
+  if (exportModal.hidden) {
+    document.body.classList.remove("modal-open");
+  }
+}
+
+async function handlePrivacyModalClick(event) {
+  const action = event.target?.dataset?.action;
+  if (action === "close-privacy-modal") {
+    closePrivacyModal();
+    return;
+  }
+  if (action === "flip-to-public") {
+    const attrEl = privacyModal.querySelector("#privacy-modal-attribution");
+    const attribution = attrEl?.value.trim();
+    if (!attribution) return;
+    await applyPrivacyFlip({
+      privacy: "public",
+      attribution,
+      confirm_flip: true,
+    });
+    return;
+  }
+  if (action === "flip-to-private") {
+    await applyPrivacyFlip({ privacy: "private", confirm_flip: true });
+    return;
+  }
+}
+
+async function applyPrivacyFlip(payload) {
+  if (!currentBank) return;
+  const bankId = bankSelect.value;
+  const submit = privacyModalActions.querySelector(
+    "[data-action=flip-to-public], [data-action=flip-to-private]",
+  );
+  if (submit) {
+    submit.disabled = true;
+    submit.textContent = "Saving…";
+  }
+  try {
+    const updated = await putConfig(bankId, payload);
+    currentBank.config = updated.config;
+    currentBank.gitignore = updated.gitignore;
+    renderPrivacyBadge(updated.config.privacy);
+    renderGitignoreBanner(updated.gitignore);
+    closePrivacyModal();
+    showToast(
+      `Privacy set to ${updated.config.privacy} · .gitignore ${updated.gitignore.status}`,
+      "success",
+    );
+  } catch (err) {
+    if (submit) {
+      submit.disabled = false;
+      submit.textContent =
+        payload.privacy === "public" ? "Flip to public" : "Make private";
+    }
+    showToast(`Flip failed: ${err.message}`, "error");
+  }
 }
 
 function formatDuration(ms) {
