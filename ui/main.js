@@ -264,10 +264,10 @@ function handleTrimAction(action, step) {
 
   switch (action) {
     case "jump-start":
-      state.playheadMs = state.startMs;
+      state.playheadMs = 0;
       break;
     case "jump-end":
-      state.playheadMs = state.endMs;
+      state.playheadMs = durationMs;
       break;
     case "nudge-playhead": {
       const delta = Number(step);
