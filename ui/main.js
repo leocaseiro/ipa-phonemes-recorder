@@ -74,6 +74,184 @@ let micStream = null;
 let toolsOk = false;
 let activeRecordingPhonemeId = null;
 let savingTake = false;
+
+// ---- Trim state ---------------------------------------------------
+// Keyed by `${bankId}/${phonemeId}/${takeId}`. Only takes that have
+// ever been edited this session appear here.
+const trimState = new Map();
+const HISTORY_CAP = 100;
+let trimStorageKey = null;
+let trimSaveTimer = 0;
+let selectedTakeBuffer = null;
+let selectedTakeArrayBuffer = null;
+
+function trimKey(bankId, phonemeId, takeId) {
+  return `${bankId}/${phonemeId}/${takeId}`;
+}
+
+function getTrim(bankId, phonemeId, takeId, durationMs) {
+  const k = trimKey(bankId, phonemeId, takeId);
+  let s = trimState.get(k);
+  if (!s) {
+    s = {
+      durationMs,
+      startMs: 0,
+      endMs: durationMs,
+      playheadMs: 0,
+      history: [{ startMs: 0, endMs: durationMs }],
+      cursor: 0,
+    };
+    trimState.set(k, s);
+  } else if (s.durationMs !== durationMs) {
+    s.durationMs = durationMs;
+    s.endMs = Math.min(s.endMs, durationMs);
+    s.history = [{ startMs: 0, endMs: durationMs }];
+    s.cursor = 0;
+  }
+  return s;
+}
+
+function pushTrimHistory(state) {
+  state.history.length = state.cursor + 1;
+  state.history.push({ startMs: state.startMs, endMs: state.endMs });
+  if (state.history.length > HISTORY_CAP) {
+    const drop = state.history.length - HISTORY_CAP;
+    state.history.splice(0, drop);
+  }
+  state.cursor = state.history.length - 1;
+  scheduleTrimSave();
+}
+
+function trimUndo(state) {
+  if (state.cursor <= 0) return false;
+  state.cursor -= 1;
+  const h = state.history[state.cursor];
+  state.startMs = h.startMs;
+  state.endMs = h.endMs;
+  scheduleTrimSave();
+  return true;
+}
+
+function trimRedo(state) {
+  if (state.cursor >= state.history.length - 1) return false;
+  state.cursor += 1;
+  const h = state.history[state.cursor];
+  state.startMs = h.startMs;
+  state.endMs = h.endMs;
+  scheduleTrimSave();
+  return true;
+}
+
+function trimReset(state) {
+  state.startMs = 0;
+  state.endMs = state.durationMs;
+  state.playheadMs = 0;
+  state.history = [{ startMs: 0, endMs: state.durationMs }];
+  state.cursor = 0;
+  scheduleTrimSave();
+}
+
+function scheduleTrimSave() {
+  if (!trimStorageKey) return;
+  clearTimeout(trimSaveTimer);
+  trimSaveTimer = setTimeout(flushTrimSave, 300);
+}
+
+function flushTrimSave() {
+  if (!trimStorageKey) return;
+  const out = {};
+  for (const [k, s] of trimState) {
+    if (s.cursor === 0) continue;
+    out[k] = {
+      startMs: s.startMs,
+      endMs: s.endMs,
+      history: s.history,
+      cursor: s.cursor,
+    };
+  }
+  try {
+    localStorage.setItem(trimStorageKey, JSON.stringify(out));
+  } catch {
+    // quota — silent
+  }
+}
+
+function loadTrimState(bankId, bank) {
+  trimState.clear();
+  trimStorageKey = `ipa-trim:${bankId}`;
+  let raw = null;
+  try {
+    raw = localStorage.getItem(trimStorageKey);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!parsed || typeof parsed !== "object") return;
+
+  const live = new Map();
+  const state = bank?.state?.phonemes ?? {};
+  for (const [pid, p] of Object.entries(state)) {
+    if (!p || !Array.isArray(p.takes)) continue;
+    const takes = new Map();
+    for (const t of p.takes) {
+      if (t && typeof t.id === "string" && typeof t.duration_ms === "number") {
+        takes.set(t.id, t.duration_ms);
+      }
+    }
+    live.set(pid, takes);
+  }
+
+  for (const [k, v] of Object.entries(parsed)) {
+    const [, pid, tid] = splitTrimKey(k);
+    const durationMs = live.get(pid)?.get(tid);
+    if (!durationMs) continue;
+    if (
+      !v ||
+      typeof v.startMs !== "number" ||
+      typeof v.endMs !== "number" ||
+      v.endMs > durationMs ||
+      v.startMs < 0 ||
+      v.startMs >= v.endMs
+    ) continue;
+    const history = Array.isArray(v.history) && v.history.length
+      ? v.history
+      : [{ startMs: 0, endMs: durationMs }];
+    const cursor = typeof v.cursor === "number"
+      ? Math.max(0, Math.min(v.cursor, history.length - 1))
+      : history.length - 1;
+    trimState.set(k, {
+      durationMs,
+      startMs: v.startMs,
+      endMs: v.endMs,
+      playheadMs: v.startMs,
+      history,
+      cursor,
+    });
+  }
+
+  if (selectedPhonemeId) refreshDirtyIndicator();
+}
+
+function splitTrimKey(k) {
+  // Key format: "<bankId>/<phonemeId>/<takeId>". Bank/phoneme/take IDs
+  // don't contain slashes in this app.
+  const parts = k.split("/");
+  return [parts[0], parts[1], parts.slice(2).join("/")];
+}
+
+function forgetTrim(bankId, phonemeId, takeId) {
+  trimState.delete(trimKey(bankId, phonemeId, takeId));
+  scheduleTrimSave();
+}
+
+window.addEventListener("beforeunload", flushTrimSave);
+
 const toastElement = ensureToast();
 
 async function init() {
@@ -174,6 +352,7 @@ async function loadBank(id) {
   try {
     const bank = await getBank(id);
     currentBank = bank;
+    loadTrimState(id, bank);
     localStorage.setItem("last_bank_id", id);
     renderPrivacyBadge(bank.config.privacy);
     renderGitignoreBanner(bank.gitignore);
@@ -255,7 +434,7 @@ function renderPhonemeList(bank) {
     li.innerHTML = `
       <span class="phoneme-item__glyph" aria-hidden="true">${glyph}</span>
       <span class="phoneme-item__ipa">${escapeHtml(phoneme.ipa)}</span>
-      <span class="phoneme-item__example">${escapeHtml(phoneme.example ?? "")}</span>
+      <span class="phoneme-item__example">${renderExamples(phoneme.example, { limit: 1 })}</span>
     `;
     li.addEventListener("click", () => selectPhoneme(phoneme.id));
     phonemeList.appendChild(li);
@@ -332,7 +511,7 @@ function renderDetail(phoneme) {
   phonemeDetail.innerHTML = `
     <div class="phoneme-detail__header">
       <span class="phoneme-detail__ipa">${escapeHtml(phoneme.ipa)}</span>
-      <span class="phoneme-detail__example">${escapeHtml(phoneme.example ?? "")}</span>
+      <span class="phoneme-detail__example">${renderExamples(phoneme.example)}</span>
       <div class="reference-controls">
         <label class="ref-source-label">Reference
           <select id="ref-source" class="ref-source" aria-label="Reference clip source">${refOpts}</select>
@@ -878,6 +1057,18 @@ function escapeHtml(value) {
   })[c]);
 }
 
+// Turns "[th]in" into "<mark>th</mark>in" (HTML-escaped first).
+// Brackets have no meaning in HTML, so escape-then-replace is safe.
+function markupExample(str) {
+  return escapeHtml(str).replace(/\[([^\]]+)\]/g, "<mark>$1</mark>");
+}
+
+function renderExamples(example, { limit = Infinity } = {}) {
+  if (example == null || example === "") return "";
+  const list = Array.isArray(example) ? example : [example];
+  return list.slice(0, limit).map(markupExample).join(", ");
+}
+
 async function grantMicAndStartMeter() {
   micGrantButton.disabled = true;
   micGrantButton.textContent = "Waiting…";
@@ -1131,6 +1322,7 @@ async function doDelete(takeId) {
 
   try {
     await deleteTake(bankId, phonemeId, takeId);
+    forgetTrim(bankId, phonemeId, takeId);
     showToast(`Deleted ${takeId}`, "success");
     if (selectedTakeId) paintWaveformForSelectedTake();
   } catch (err) {
