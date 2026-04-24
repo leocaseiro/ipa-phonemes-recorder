@@ -23,6 +23,7 @@ import {
   playBuffer,
   playRange,
   renderWaveform,
+  renderWaveformFromBuffer,
   requestMic,
   startMeter,
   stopPlayback,
@@ -271,7 +272,7 @@ function handleTrimAction(action, step) {
       break;
     case "nudge-playhead": {
       const delta = Number(step);
-      state.playheadMs = Math.max(state.startMs, Math.min(state.endMs, state.playheadMs + delta));
+      state.playheadMs = Math.max(0, Math.min(durationMs, state.playheadMs + delta));
       break;
     }
     case "set-start": {
@@ -1651,14 +1652,16 @@ function paintTrimOverlay(canvas) {
   ctx2d.fillRect(Math.max(0, xStart - 1), 0, 3, h);
   ctx2d.fillRect(Math.min(w - 3, xEnd - 1), 0, 3, h);
 
-  ctx2d.fillStyle = "#ffffff";
-  ctx2d.fillRect(Math.max(0, Math.min(w - 1, xHead)), 0, 1, h);
+  const headX = Math.max(0, Math.min(w - 2, xHead));
+  ctx2d.fillStyle = "#ff3b6b";
+  ctx2d.fillRect(headX, 0, 2, h);
 }
 
 function repaintTrim() {
   const canvas = phonemeDetail.querySelector(".take-waveform");
-  if (!canvas || !selectedTakeArrayBuffer) return;
-  renderWaveform(canvas, selectedTakeArrayBuffer).then(() => paintTrimOverlay(canvas));
+  if (!canvas || !selectedTakeBuffer) return;
+  renderWaveformFromBuffer(canvas, selectedTakeBuffer);
+  paintTrimOverlay(canvas);
   updateTrimReadout();
 }
 
@@ -1696,7 +1699,7 @@ function attachTrimPointerHandlers(canvas) {
     } else if (dragging === "end") {
       state.endMs = Math.min(state.durationMs, Math.max(state.startMs + 10, ms));
     } else {
-      state.playheadMs = Math.max(state.startMs, Math.min(state.endMs, ms));
+      state.playheadMs = Math.max(0, Math.min(state.durationMs, ms));
     }
     repaintTrim();
   }

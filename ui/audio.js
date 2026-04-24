@@ -94,6 +94,10 @@ export function stopMeter() {
 export async function renderWaveform(canvas, arrayBuffer) {
   const ctx = ensureContext();
   const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+  renderWaveformFromBuffer(canvas, audioBuffer);
+}
+
+export function renderWaveformFromBuffer(canvas, audioBuffer) {
   const data = audioBuffer.getChannelData(0);
   paintWaveform(canvas, data);
 }
