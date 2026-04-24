@@ -798,6 +798,83 @@ function handleKeyDown(event) {
     runExport();
     return;
   }
+
+  if (!selectedTakeId || !selectedTakeBuffer) return;
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    const dir = event.key === "ArrowLeft" ? -1 : 1;
+    const step = event.shiftKey ? 100 : 10;
+    event.preventDefault();
+    if (event.altKey) {
+      nudgeNearestHandle(dir * step);
+    } else {
+      handleTrimAction("nudge-playhead", String(dir * step));
+    }
+    return;
+  }
+
+  if (event.key === "Home") {
+    event.preventDefault();
+    handleTrimAction("jump-start");
+    return;
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    handleTrimAction("jump-end");
+    return;
+  }
+
+  if (event.key === "[") {
+    event.preventDefault();
+    handleTrimAction("set-start");
+    return;
+  }
+
+  if (event.key === "]") {
+    event.preventDefault();
+    handleTrimAction("set-end");
+    return;
+  }
+
+  if (event.key === ",") {
+    event.preventDefault();
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    state.playheadMs = state.startMs;
+    repaintTrim();
+    return;
+  }
+
+  if (event.key === ".") {
+    event.preventDefault();
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    state.playheadMs = state.endMs;
+    repaintTrim();
+    return;
+  }
+
+  if (event.key === "p" || event.key === "P") {
+    event.preventDefault();
+    handleTrimAction("play-selection");
+    return;
+  }
+
+  if ((event.key === "s" || event.key === "S") && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    handleTrimAction("save");
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && (event.key === "z" || event.key === "Z")) {
+    event.preventDefault();
+    if (event.shiftKey) handleTrimAction("redo");
+    else handleTrimAction("undo");
+    return;
+  }
 }
 
 async function runExport() {
