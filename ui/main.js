@@ -254,6 +254,93 @@ function forgetTrim(bankId, phonemeId, takeId) {
 
 window.addEventListener("beforeunload", flushTrimSave);
 
+function handleTrimAction(action, step) {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  let changed = false;
+
+  switch (action) {
+    case "jump-start":
+      state.playheadMs = state.startMs;
+      break;
+    case "jump-end":
+      state.playheadMs = state.endMs;
+      break;
+    case "nudge-playhead": {
+      const delta = Number(step);
+      state.playheadMs = Math.max(state.startMs, Math.min(state.endMs, state.playheadMs + delta));
+      break;
+    }
+    case "set-start": {
+      const newStart = Math.min(state.playheadMs, state.endMs - 10);
+      if (newStart !== state.startMs) {
+        state.startMs = Math.max(0, newStart);
+        pushTrimHistory(state);
+        changed = true;
+      }
+      break;
+    }
+    case "set-end": {
+      const newEnd = Math.max(state.playheadMs, state.startMs + 10);
+      if (newEnd !== state.endMs) {
+        state.endMs = Math.min(durationMs, newEnd);
+        pushTrimHistory(state);
+        changed = true;
+      }
+      break;
+    }
+    case "undo":
+      changed = trimUndo(state);
+      break;
+    case "redo":
+      changed = trimRedo(state);
+      break;
+    case "reset":
+      trimReset(state);
+      changed = true;
+      break;
+    case "play-selection":
+      playRange(selectedTakeBuffer, state.startMs, state.endMs);
+      break;
+    case "save":
+      saveTrimAsNewTake();
+      return;
+  }
+
+  repaintTrim();
+  if (changed) refreshDirtyIndicator();
+}
+
+function nudgeNearestHandle(deltaMs) {
+  if (!selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  const pickStart =
+    state.playheadMs - state.startMs <= state.endMs - state.playheadMs;
+  if (pickStart) {
+    const v = Math.max(0, Math.min(state.endMs - 10, state.startMs + deltaMs));
+    if (v !== state.startMs) {
+      state.startMs = v;
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  } else {
+    const v = Math.max(state.startMs + 10, Math.min(durationMs, state.endMs + deltaMs));
+    if (v !== state.endMs) {
+      state.endMs = v;
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  }
+  repaintTrim();
+}
+
+// Implemented in M10.
+async function saveTrimAsNewTake() {}
+
 // Implemented in M9.
 function refreshDirtyIndicator() {}
 
@@ -536,7 +623,24 @@ function renderDetail(phoneme) {
     ${takes.length === 0
       ? '<p class="placeholder">No takes yet. Press R (or click Record) to record one.</p>'
       : `<ul class="takes-list">${takes.map((t) => renderTakeRow(t, keeperTakeId)).join("")}</ul>
-         <canvas class="take-waveform" height="80" aria-label="Waveform of selected take"></canvas>`}
+         <canvas class="take-waveform" height="80" aria-label="Waveform of selected take"></canvas>
+         <div class="trim-bar" role="toolbar" aria-label="Trim controls">
+           <button class="trim-btn" data-trim-action="jump-start" title="Jump to start (Home)" type="button">⏮</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="-100" title="Back 100 ms (Shift+←)" type="button">«</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="-10" title="Back 10 ms (←)" type="button">‹</button>
+           <button class="trim-btn" data-trim-action="set-start" title="Set trim start ([)" type="button">[</button>
+           <button class="trim-btn trim-btn--play" data-trim-action="play-selection" title="Play selection (P)" type="button">▶ sel</button>
+           <button class="trim-btn" data-trim-action="set-end" title="Set trim end (])" type="button">]</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="10" title="Forward 10 ms (→)" type="button">›</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="100" title="Forward 100 ms (Shift+→)" type="button">»</button>
+           <button class="trim-btn" data-trim-action="jump-end" title="Jump to end (End)" type="button">⏭</button>
+           <span class="trim-bar__spacer"></span>
+           <button class="trim-btn" data-trim-action="undo" title="Undo (Cmd/Ctrl+Z)" type="button">↶</button>
+           <button class="trim-btn" data-trim-action="redo" title="Redo (Cmd/Ctrl+Shift+Z)" type="button">↷</button>
+           <button class="trim-btn" data-trim-action="reset" title="Reset trim" type="button">✕</button>
+           <span class="trim-bar__readout" data-trim-readout>0 / 0 ms</span>
+           <button class="trim-btn trim-btn--save" data-trim-action="save" title="Save as new take (S)" type="button">💾 Save</button>
+         </div>`}
   `;
 }
 
@@ -1196,6 +1300,13 @@ function applyTakeLocally(phonemeId, take) {
 }
 
 function handleDetailClick(event) {
+  const trimBtn = event.target.closest("[data-trim-action]");
+  if (trimBtn) {
+    event.preventDefault();
+    handleTrimAction(trimBtn.dataset.trimAction, trimBtn.dataset.step);
+    return;
+  }
+
   const actionEl = event.target.closest("[data-action]");
   const action = actionEl?.dataset.action;
 
