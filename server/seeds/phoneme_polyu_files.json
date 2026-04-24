@@ -43,5 +43,9 @@
   "sh": "SH.mp3",
   "u_short": "SHORT_U.mp3",
   "uh": "UP.mp3",
-  "th_vl": "THIN.mp3"
+  "th_vl": "THIN.mp3",
+  "schwa": "SCHWA.mp3",
+  "zh": "ZH.mp3",
+  "oh": "OH.mp3",
+  "oo_er": "OO-ER.mp3"
 }
