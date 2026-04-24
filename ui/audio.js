@@ -98,6 +98,11 @@ export async function renderWaveform(canvas, arrayBuffer) {
   paintWaveform(canvas, data);
 }
 
+export async function decodeBuffer(arrayBuffer) {
+  const ctx = ensureContext();
+  return ctx.decodeAudioData(arrayBuffer.slice(0));
+}
+
 export async function playBuffer(arrayBuffer, { onEnded } = {}) {
   const ctx = ensureContext();
   if (ctx.state === "suspended") {
@@ -120,6 +125,32 @@ export async function playBuffer(arrayBuffer, { onEnded } = {}) {
   };
   playbackSource = source;
   source.start();
+  return source;
+}
+
+export async function playRange(audioBuffer, startMs, endMs, { onEnded } = {}) {
+  const ctx = ensureContext();
+  if (ctx.state === "suspended") {
+    try {
+      await ctx.resume();
+    } catch {
+      // non-fatal
+    }
+  }
+  stopPlayback();
+  const source = ctx.createBufferSource();
+  source.buffer = audioBuffer;
+  source.connect(ctx.destination);
+  source.onended = () => {
+    if (playbackSource === source) {
+      playbackSource = null;
+      onEnded?.();
+    }
+  };
+  playbackSource = source;
+  const offsetSec = Math.max(0, startMs / 1000);
+  const durationSec = Math.max(0, (endMs - startMs) / 1000);
+  source.start(0, offsetSec, durationSec);
   return source;
 }
 
