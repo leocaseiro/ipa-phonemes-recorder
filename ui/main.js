@@ -341,8 +341,21 @@ function nudgeNearestHandle(deltaMs) {
 // Implemented in M10.
 async function saveTrimAsNewTake() {}
 
-// Implemented in M9.
-function refreshDirtyIndicator() {}
+function refreshDirtyIndicator() {
+  if (!selectedPhonemeId || !currentBank) return;
+  const bankId = bankSelect.value;
+  const phonemeState = currentBank.state?.phonemes?.[selectedPhonemeId];
+  const takes = phonemeState?.takes ?? [];
+  for (const take of takes) {
+    const row = phonemeDetail.querySelector(`[data-take-id="${CSS.escape(take.id)}"] .takes-item__id`);
+    if (!row) continue;
+    const k = trimKey(bankId, selectedPhonemeId, take.id);
+    const dirty = (trimState.get(k)?.cursor ?? 0) > 0;
+    const prefix = dirty ? "● " : "";
+    const expected = `${prefix}${take.id}`;
+    if (row.textContent !== expected) row.textContent = expected;
+  }
+}
 
 const toastElement = ensureToast();
 
@@ -661,6 +674,8 @@ function renderTakeRow(take, keeperTakeId) {
   const isSelected = take.id === selectedTakeId;
   const isThisPlaying = take.id === playingTakeId;
   const playGlyph = isThisPlaying ? "■" : "▶";
+  const bankId = bankSelect.value;
+  const dirty = (trimState.get(trimKey(bankId, selectedPhonemeId, take.id))?.cursor ?? 0) > 0;
   const classes = [
     "takes-item",
     isKeeper ? "takes-item--keeper" : "",
@@ -671,7 +686,7 @@ function renderTakeRow(take, keeperTakeId) {
   return `
     <li class="${classes}" data-take-id="${escapeHtml(take.id)}">
       <button class="takes-btn takes-btn--play" data-action="play" type="button" aria-label="Play ${escapeHtml(take.id)}">${playGlyph}</button>
-      <span class="takes-item__id">${escapeHtml(take.id)}</span>
+      <span class="takes-item__id">${dirty ? "● " : ""}${escapeHtml(take.id)}</span>
       <span class="takes-item__duration">${take.duration_ms} ms</span>
       <span class="takes-item__peak">peak ${formatDb(take.peak_db)}</span>
       <span class="takes-item__rms">rms ${formatDb(take.rms_db)}</span>
