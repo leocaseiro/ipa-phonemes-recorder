@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 TAKE_ID_RE = re.compile(r"^take-(\d+)$")
 FFMPEG_TIMEOUT_SECONDS = 30
+MIN_TRIM_MS = 10
 
 
 @dataclass
@@ -215,6 +216,89 @@ def save_take(
         take_id=take_id,
         wav_path=wav_path,
         tmp_cleanup=tmp_src,
+    )
+
+
+def trim_take(
+    *,
+    bank_path: Path,
+    phoneme_id: str,
+    source_take_id: str,
+    start_ms: int,
+    end_ms: int,
+    ffmpeg: Path,
+) -> TakeMeta:
+    """Create a new take from a trimmed region of an existing take.
+
+    The source WAV is never modified. The new take is appended with
+    a `source_take_id` field for provenance. Validation failures
+    raise TakeSaveFailed with code `trim_invalid_range`.
+    """
+    if not TAKE_ID_RE.match(source_take_id):
+        raise TakeNotFound(phoneme_id, source_take_id)
+
+    source_wav = bank_path / "raw" / phoneme_id / f"{source_take_id}.wav"
+    if not source_wav.is_file():
+        raise TakeNotFound(phoneme_id, source_take_id)
+
+    _, _, source_duration_ms = compute_peak_rms(source_wav)
+
+    if (
+        not isinstance(start_ms, int)
+        or not isinstance(end_ms, int)
+        or start_ms < 0
+        or end_ms <= start_ms
+        or end_ms > source_duration_ms
+        or (end_ms - start_ms) < MIN_TRIM_MS
+    ):
+        raise TakeSaveFailed(
+            "trim_invalid_range",
+            f"invalid trim range: start={start_ms} end={end_ms} "
+            f"source_duration={source_duration_ms}",
+        )
+
+    phoneme_dir = bank_path / "raw" / phoneme_id
+    state = read_state(bank_path)
+    new_take_id = next_take_id(phoneme_dir, state, phoneme_id)
+    wav_path = phoneme_dir / f"{new_take_id}.wav"
+
+    start_s = start_ms / 1000.0
+    end_s = end_ms / 1000.0
+
+    try:
+        result = subprocess.run(
+            [
+                str(ffmpeg), "-y", "-i", str(source_wav),
+                "-ss", f"{start_s:.3f}", "-to", f"{end_s:.3f}",
+                "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le",
+                str(wav_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TakeSaveFailed(
+            "ffmpeg_timeout",
+            f"ffmpeg timed out after {FFMPEG_TIMEOUT_SECONDS}s",
+        ) from exc
+
+    if result.returncode != 0:
+        if wav_path.exists():
+            wav_path.unlink()
+        raise TakeSaveFailed(
+            "ffmpeg_failed",
+            "trimming failed",
+            detail=result.stderr[-1500:],
+        )
+
+    return _finalize_wav(
+        bank_path=bank_path,
+        phoneme_id=phoneme_id,
+        take_id=new_take_id,
+        wav_path=wav_path,
+        tmp_cleanup=None,
+        source_take_id=source_take_id,
     )
 
 
