@@ -168,7 +168,7 @@ session).
 
 ### New endpoint
 
-```
+```http
 POST /api/banks/:bankId/phonemes/:phonemeId/takes/:takeId/trim
 Content-Type: application/json
 Body: { "start_ms": 180, "end_ms": 2100 }
@@ -192,7 +192,7 @@ Violation → 400 with code `trim_invalid_range`.
 
 ### ffmpeg invocation
 
-```
+```sh
 ffmpeg -y -i <source.wav> -ss <start_s> -to <end_s>
        -ar 48000 -ac 1 -c:a pcm_s16le <dest.wav>
 ```
