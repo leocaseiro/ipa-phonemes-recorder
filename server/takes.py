@@ -51,6 +51,82 @@ class TakeNotFound(Exception):
         super().__init__(f"take not found: {phoneme_id}/{take_id}")
 
 
+def _finalize_wav(
+    *,
+    bank_path: Path,
+    phoneme_id: str,
+    take_id: str,
+    wav_path: Path,
+    tmp_cleanup: Path | None,
+    source_take_id: str | None = None,
+) -> TakeMeta:
+    """Measure a freshly written WAV, append it to state, return meta.
+
+    Shared tail of save_take and trim_take. `wav_path` must already
+    exist on disk. `tmp_cleanup`, if given, is unlinked after state
+    is written (best-effort). `source_take_id` is persisted on the
+    take entry when non-None (provenance for trims).
+    """
+    try:
+        peak_db, rms_db, duration_ms = compute_peak_rms(wav_path)
+    except Exception as exc:
+        wav_path.unlink(missing_ok=True)
+        raise TakeSaveFailed(
+            "wav_unreadable",
+            "transcoded WAV could not be measured",
+            detail=str(exc),
+            tmp_path=tmp_cleanup,
+        ) from exc
+
+    created_at = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+    state = read_state(bank_path)
+    phonemes = state.setdefault("phonemes", {})
+    if phoneme_id not in phonemes:
+        phonemes[phoneme_id] = {"keeper_take": None, "takes": []}
+    phoneme_entry = phonemes[phoneme_id]
+    phoneme_entry.setdefault("keeper_take", None)
+    phoneme_entry.setdefault("takes", [])
+
+    take_entry: dict = {
+        "id": take_id,
+        "created_at": created_at,
+        "duration_ms": duration_ms,
+        "peak_db": peak_db,
+        "rms_db": rms_db,
+        "notes": "",
+    }
+    if source_take_id is not None:
+        take_entry["source_take_id"] = source_take_id
+    phoneme_entry["takes"].append(take_entry)
+
+    new_number = int(take_id.removeprefix("take-"))
+    current_high = phoneme_entry.get("max_take_id")
+    if not isinstance(current_high, int) or new_number > current_high:
+        phoneme_entry["max_take_id"] = new_number
+    state["last_phoneme_id"] = phoneme_id
+    write_state(bank_path, state)
+
+    if tmp_cleanup is not None:
+        try:
+            tmp_cleanup.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("could not clean up %s: %s", tmp_cleanup, exc)
+
+    return TakeMeta(
+        take_id=take_id,
+        duration_ms=duration_ms,
+        peak_db=peak_db,
+        rms_db=rms_db,
+        created_at=created_at,
+    )
+
+
 def next_take_id(phoneme_dir: Path, state: dict, phoneme_id: str) -> str:
     """Next id to assign for a new take of `phoneme_id`.
 
@@ -133,58 +209,12 @@ def save_take(
             tmp_path=tmp_src,
         )
 
-    try:
-        peak_db, rms_db, duration_ms = compute_peak_rms(wav_path)
-    except Exception as exc:
-        wav_path.unlink(missing_ok=True)
-        raise TakeSaveFailed(
-            "wav_unreadable",
-            "transcoded WAV could not be measured",
-            detail=str(exc),
-            tmp_path=tmp_src,
-        ) from exc
-
-    created_at = (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
-
-    phonemes = state.setdefault("phonemes", {})
-    if phoneme_id not in phonemes:
-        phonemes[phoneme_id] = {"keeper_take": None, "takes": []}
-    phoneme_entry = phonemes[phoneme_id]
-    phoneme_entry.setdefault("keeper_take", None)
-    phoneme_entry.setdefault("takes", [])
-    phoneme_entry["takes"].append(
-        {
-            "id": take_id,
-            "created_at": created_at,
-            "duration_ms": duration_ms,
-            "peak_db": peak_db,
-            "rms_db": rms_db,
-            "notes": "",
-        }
-    )
-    new_number = int(take_id.removeprefix("take-"))
-    current_high = phoneme_entry.get("max_take_id")
-    if not isinstance(current_high, int) or new_number > current_high:
-        phoneme_entry["max_take_id"] = new_number
-    state["last_phoneme_id"] = phoneme_id
-    write_state(bank_path, state)
-
-    try:
-        tmp_src.unlink(missing_ok=True)
-    except OSError as exc:
-        logger.warning("could not clean up %s: %s", tmp_src, exc)
-
-    return TakeMeta(
+    return _finalize_wav(
+        bank_path=bank_path,
+        phoneme_id=phoneme_id,
         take_id=take_id,
-        duration_ms=duration_ms,
-        peak_db=peak_db,
-        rms_db=rms_db,
-        created_at=created_at,
+        wav_path=wav_path,
+        tmp_cleanup=tmp_src,
     )
 
 
