@@ -1021,3 +1021,55 @@ body {
   width: 100%;
   touch-action: none;
 }
+
+/* --- Shortcuts cheatsheet ----------------------------------------- */
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.shortcuts-table th,
+.shortcuts-table td {
+  text-align: left;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.shortcuts-table th {
+  font-weight: 600;
+  color: var(--fg-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.shortcuts-table td:first-child {
+  white-space: nowrap;
+  font-family: monospace;
+  color: var(--accent);
+}
+
+.shortcuts-table kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  font: inherit;
+  font-size: 11px;
+  margin: 0 1px;
+}
+
+.shortcuts-table__group {
+  font-weight: 600;
+  color: var(--accent);
+  padding-top: 12px !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
+}

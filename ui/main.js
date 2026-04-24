@@ -54,6 +54,7 @@ const newBankForm = document.getElementById("new-bank-form");
 const newBankError = document.getElementById("new-bank-error");
 const newBankInventorySelect = document.getElementById("new-bank-inventory");
 const newBankSubmit = document.getElementById("new-bank-submit");
+const shortcutsModal = document.getElementById("shortcuts-modal");
 
 const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
@@ -422,6 +423,9 @@ async function init() {
     if (event.target?.dataset?.action === "close-new-bank-modal") closeNewBankModal();
   });
   newBankForm.addEventListener("submit", submitNewBank);
+  shortcutsModal.addEventListener("click", (event) => {
+    if (event.target?.dataset?.action === "close-shortcuts-modal") closeShortcutsModal();
+  });
   phonemeDetail.addEventListener("change", (e) => {
     if (e.target?.id === "ref-source") {
       localStorage.setItem("reference_source", e.target.value);
@@ -777,6 +781,15 @@ function handleKeyDown(event) {
     return;
   }
 
+  // Shortcuts cheatsheet — Escape closes; everything else suppressed.
+  if (!shortcutsModal.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeShortcutsModal();
+    }
+    return;
+  }
+
   // Delete-confirm acts as a modal: only Enter confirms and Escape cancels;
   // every other shortcut is ignored until the user resolves it.
   if (pendingDeleteTakeId) {
@@ -848,6 +861,12 @@ function handleKeyDown(event) {
     if (!currentBank) return;
     event.preventDefault();
     runExport();
+    return;
+  }
+
+  if (event.key === "?") {
+    event.preventDefault();
+    openShortcutsModal();
     return;
   }
 
@@ -1143,6 +1162,19 @@ function closeNewBankModal() {
     document.body.classList.remove("modal-open");
   }
   newBankButton.focus();
+}
+
+function openShortcutsModal() {
+  shortcutsModal.hidden = false;
+  document.body.classList.add("modal-open");
+  shortcutsModal.querySelector(".modal__btn")?.focus();
+}
+
+function closeShortcutsModal() {
+  shortcutsModal.hidden = true;
+  if (exportModal.hidden && privacyModal.hidden && newBankModal.hidden) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 function populateInventorySelect() {
