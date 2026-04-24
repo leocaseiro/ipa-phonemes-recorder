@@ -1652,9 +1652,13 @@ function paintTrimOverlay(canvas) {
   ctx2d.fillRect(Math.max(0, xStart - 1), 0, 3, h);
   ctx2d.fillRect(Math.min(w - 3, xEnd - 1), 0, 3, h);
 
-  const headX = Math.max(0, Math.min(w - 2, xHead));
+  const headX = Math.max(0, Math.min(w - 3, xHead - 1));
+  // White outline so the red line is visible over both the orange
+  // handles and the dimmed region.
+  ctx2d.fillStyle = "#ffffff";
+  ctx2d.fillRect(headX, 0, 4, h);
   ctx2d.fillStyle = "#ff3b6b";
-  ctx2d.fillRect(headX, 0, 2, h);
+  ctx2d.fillRect(headX + 1, 0, 2, h);
 }
 
 function repaintTrim() {
@@ -1688,8 +1692,11 @@ function attachTrimPointerHandlers(canvas) {
 
   function hitTest(ms, state) {
     const tolerance = Math.max(20, Math.round(state.durationMs * 0.02));
-    if (Math.abs(ms - state.startMs) <= tolerance) return "start";
-    if (Math.abs(ms - state.endMs) <= tolerance) return "end";
+    // Grab a handle only when clicking just INSIDE the trim — past the
+    // handle is still the playhead, so the user can move the playhead
+    // outside the selection to extend the trim.
+    if (ms >= state.startMs && ms - state.startMs <= tolerance) return "start";
+    if (ms <= state.endMs && state.endMs - ms <= tolerance) return "end";
     return "playhead";
   }
 
