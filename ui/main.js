@@ -13,6 +13,7 @@ import {
   postBank,
   postExport,
   postTake,
+  postTrim,
   putConfig,
   putState,
 } from "/ui/api.js";
@@ -338,8 +339,43 @@ function nudgeNearestHandle(deltaMs) {
   repaintTrim();
 }
 
-// Implemented in M10.
-async function saveTrimAsNewTake() {}
+async function saveTrimAsNewTake() {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  const sourceTakeId = selectedTakeId;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, phonemeId, sourceTakeId, durationMs);
+  if (state.cursor === 0) {
+    showToast("No trim to save", "info");
+    return;
+  }
+  const { startMs, endMs } = state;
+  try {
+    const meta = await postTrim(bankId, phonemeId, sourceTakeId, startMs, endMs);
+    const phonemeState = currentBank.state.phonemes[phonemeId] ?? { takes: [], keeper_take: null };
+    phonemeState.takes = [
+      ...phonemeState.takes,
+      {
+        id: meta.id,
+        created_at: meta.created_at,
+        duration_ms: meta.duration_ms,
+        peak_db: meta.peak_db,
+        rms_db: meta.rms_db,
+        notes: "",
+        source_take_id: meta.source_take_id,
+      },
+    ];
+    currentBank.state.phonemes[phonemeId] = phonemeState;
+
+    forgetTrim(bankId, phonemeId, sourceTakeId);
+    renderPhonemeList(currentBank);
+    refreshDetailOnly();
+    showToast(`Saved ${meta.id} (${meta.duration_ms} ms)`, "success");
+  } catch (err) {
+    showToast(`Trim save failed: ${err.message}`, "error");
+  }
+}
 
 function refreshDirtyIndicator() {
   if (!selectedPhonemeId || !currentBank) return;
