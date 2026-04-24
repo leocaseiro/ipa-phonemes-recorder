@@ -17,8 +17,10 @@ import {
   putState,
 } from "/ui/api.js";
 import {
+  decodeBuffer,
   isPlaying,
   playBuffer,
+  playRange,
   renderWaveform,
   requestMic,
   startMeter,
@@ -251,6 +253,9 @@ function forgetTrim(bankId, phonemeId, takeId) {
 }
 
 window.addEventListener("beforeunload", flushTrimSave);
+
+// Implemented in M9.
+function refreshDirtyIndicator() {}
 
 const toastElement = ensureToast();
 
@@ -1348,22 +1353,147 @@ async function paintWaveformForSelectedTake() {
   const canvas = phonemeDetail.querySelector(".take-waveform");
   if (!canvas) return;
   sizeCanvasToDisplay(canvas);
+
   const bankId = bankSelect.value;
   const phonemeId = selectedPhonemeId;
   const takeId = selectedTakeId;
-  let buffer;
+
+  let arrayBuffer;
   try {
-    buffer = await getTakeWav(bankId, phonemeId, takeId);
+    arrayBuffer = await getTakeWav(bankId, phonemeId, takeId);
   } catch {
+    selectedTakeBuffer = null;
+    selectedTakeArrayBuffer = null;
     return;
   }
-  // Race: selection may have moved while fetching.
   if (selectedPhonemeId !== phonemeId || selectedTakeId !== takeId) return;
+
+  let audioBuffer;
   try {
-    await renderWaveform(canvas, buffer);
+    audioBuffer = await decodeBuffer(arrayBuffer);
+  } catch {
+    selectedTakeBuffer = null;
+    return;
+  }
+  if (selectedPhonemeId !== phonemeId || selectedTakeId !== takeId) return;
+
+  selectedTakeArrayBuffer = arrayBuffer;
+  selectedTakeBuffer = audioBuffer;
+
+  try {
+    await renderWaveform(canvas, arrayBuffer);
   } catch {
     // decodeAudioData can throw on odd inputs; silent.
   }
+  paintTrimOverlay(canvas);
+  attachTrimPointerHandlers(canvas);
+  updateTrimReadout();
+}
+
+function paintTrimOverlay(canvas) {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+
+  const ctx2d = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const xStart = Math.round((state.startMs / durationMs) * w);
+  const xEnd = Math.round((state.endMs / durationMs) * w);
+  const xHead = Math.round((state.playheadMs / durationMs) * w);
+
+  ctx2d.fillStyle = "rgba(0,0,0,0.45)";
+  if (xStart > 0) ctx2d.fillRect(0, 0, xStart, h);
+  if (xEnd < w) ctx2d.fillRect(xEnd, 0, w - xEnd, h);
+
+  ctx2d.fillStyle = "#f5a623";
+  ctx2d.fillRect(Math.max(0, xStart - 1), 0, 3, h);
+  ctx2d.fillRect(Math.min(w - 3, xEnd - 1), 0, 3, h);
+
+  ctx2d.fillStyle = "#ffffff";
+  ctx2d.fillRect(Math.max(0, Math.min(w - 1, xHead)), 0, 1, h);
+}
+
+function repaintTrim() {
+  const canvas = phonemeDetail.querySelector(".take-waveform");
+  if (!canvas || !selectedTakeArrayBuffer) return;
+  renderWaveform(canvas, selectedTakeArrayBuffer).then(() => paintTrimOverlay(canvas));
+  updateTrimReadout();
+}
+
+function updateTrimReadout() {
+  const readout = phonemeDetail.querySelector("[data-trim-readout]");
+  if (!readout || !selectedTakeBuffer) return;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const bankId = bankSelect.value;
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  readout.textContent = `${state.startMs} / ${state.endMs} ms (head ${state.playheadMs})`;
+}
+
+function attachTrimPointerHandlers(canvas) {
+  if (canvas.dataset.trimBound === "1") return;
+  canvas.dataset.trimBound = "1";
+  let dragging = null;
+
+  function msFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const durationMs = Math.round((selectedTakeBuffer?.duration ?? 0) * 1000);
+    return Math.round(ratio * durationMs);
+  }
+
+  function hitTest(ms, state) {
+    const tolerance = Math.max(20, Math.round(state.durationMs * 0.02));
+    if (Math.abs(ms - state.startMs) <= tolerance) return "start";
+    if (Math.abs(ms - state.endMs) <= tolerance) return "end";
+    return "playhead";
+  }
+
+  function applyDrag(ms, state) {
+    if (dragging === "start") {
+      state.startMs = Math.max(0, Math.min(state.endMs - 10, ms));
+    } else if (dragging === "end") {
+      state.endMs = Math.min(state.durationMs, Math.max(state.startMs + 10, ms));
+    } else {
+      state.playheadMs = Math.max(state.startMs, Math.min(state.endMs, ms));
+    }
+    repaintTrim();
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!selectedTakeBuffer) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    const ms = msFromEvent(e);
+    dragging = hitTest(ms, state);
+    canvas.setPointerCapture(e.pointerId);
+    applyDrag(ms, state);
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    applyDrag(msFromEvent(e), state);
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    if (!dragging) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    const wasHandleDrag = dragging === "start" || dragging === "end";
+    dragging = null;
+    try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (wasHandleDrag) {
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  });
 }
 
 function sizeCanvasToDisplay(canvas) {
