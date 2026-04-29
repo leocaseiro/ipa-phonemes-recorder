@@ -1,0 +1,27 @@
+{
+  "last_phoneme_id": "sh",
+  "last_input_device": null,
+  "phonemes": {
+    "sh": {
+      "keeper_take": "take-001",
+      "max_take_id": 1,
+      "takes": [
+        { "id": "take-001", "created_at": "2026-04-23T00:00:00Z", "duration_ms": 200, "peak_db": -6.0, "rms_db": -9.0, "notes": "" }
+      ]
+    },
+    "k": {
+      "keeper_take": "take-001",
+      "max_take_id": 1,
+      "takes": [
+        { "id": "take-001", "created_at": "2026-04-23T00:00:00Z", "duration_ms": 100, "peak_db": -6.0, "rms_db": -9.0, "notes": "" }
+      ]
+    },
+    "ee": {
+      "keeper_take": "take-001",
+      "max_take_id": 1,
+      "takes": [
+        { "id": "take-001", "created_at": "2026-04-23T00:00:00Z", "duration_ms": 300, "peak_db": -6.0, "rms_db": -9.0, "notes": "" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "total_duration_ms_expected": 650,
+  "mp3_duration_s_probed": 0.649977,
+  "mp3_duration_tolerance_ms": 40,
+  "sample_rate": 22050,
+  "channels": 1
+}
