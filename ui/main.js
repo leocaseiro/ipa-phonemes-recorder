@@ -13,13 +13,17 @@ import {
   postBank,
   postExport,
   postTake,
+  postTrim,
   putConfig,
   putState,
 } from "/ui/api.js";
 import {
+  decodeBuffer,
   isPlaying,
   playBuffer,
+  playRange,
   renderWaveform,
+  renderWaveformFromBuffer,
   requestMic,
   startMeter,
   stopPlayback,
@@ -50,6 +54,7 @@ const newBankForm = document.getElementById("new-bank-form");
 const newBankError = document.getElementById("new-bank-error");
 const newBankInventorySelect = document.getElementById("new-bank-inventory");
 const newBankSubmit = document.getElementById("new-bank-submit");
+const shortcutsModal = document.getElementById("shortcuts-modal");
 
 const METER_DB_FLOOR = -60;
 const METER_DECAY_DB_PER_SEC = 40;
@@ -74,6 +79,322 @@ let micStream = null;
 let toolsOk = false;
 let activeRecordingPhonemeId = null;
 let savingTake = false;
+
+// ---- Trim state ---------------------------------------------------
+// Keyed by `${bankId}/${phonemeId}/${takeId}`. Only takes that have
+// ever been edited this session appear here.
+const trimState = new Map();
+const HISTORY_CAP = 100;
+let trimStorageKey = null;
+let trimSaveTimer = 0;
+let selectedTakeBuffer = null;
+let selectedTakeArrayBuffer = null;
+
+function trimKey(bankId, phonemeId, takeId) {
+  return `${bankId}/${phonemeId}/${takeId}`;
+}
+
+function getTrim(bankId, phonemeId, takeId, durationMs) {
+  const k = trimKey(bankId, phonemeId, takeId);
+  let s = trimState.get(k);
+  if (!s) {
+    s = {
+      durationMs,
+      startMs: 0,
+      endMs: durationMs,
+      playheadMs: 0,
+      history: [{ startMs: 0, endMs: durationMs }],
+      cursor: 0,
+    };
+    trimState.set(k, s);
+  } else if (s.durationMs !== durationMs) {
+    s.durationMs = durationMs;
+    s.endMs = Math.min(s.endMs, durationMs);
+    s.history = [{ startMs: 0, endMs: durationMs }];
+    s.cursor = 0;
+  }
+  return s;
+}
+
+function pushTrimHistory(state) {
+  state.history.length = state.cursor + 1;
+  state.history.push({ startMs: state.startMs, endMs: state.endMs });
+  if (state.history.length > HISTORY_CAP) {
+    const drop = state.history.length - HISTORY_CAP;
+    state.history.splice(0, drop);
+  }
+  state.cursor = state.history.length - 1;
+  scheduleTrimSave();
+}
+
+function trimUndo(state) {
+  if (state.cursor <= 0) return false;
+  state.cursor -= 1;
+  const h = state.history[state.cursor];
+  state.startMs = h.startMs;
+  state.endMs = h.endMs;
+  scheduleTrimSave();
+  return true;
+}
+
+function trimRedo(state) {
+  if (state.cursor >= state.history.length - 1) return false;
+  state.cursor += 1;
+  const h = state.history[state.cursor];
+  state.startMs = h.startMs;
+  state.endMs = h.endMs;
+  scheduleTrimSave();
+  return true;
+}
+
+function trimReset(state) {
+  state.startMs = 0;
+  state.endMs = state.durationMs;
+  state.playheadMs = 0;
+  state.history = [{ startMs: 0, endMs: state.durationMs }];
+  state.cursor = 0;
+  scheduleTrimSave();
+}
+
+function scheduleTrimSave() {
+  if (!trimStorageKey) return;
+  clearTimeout(trimSaveTimer);
+  trimSaveTimer = setTimeout(flushTrimSave, 300);
+}
+
+function flushTrimSave() {
+  if (!trimStorageKey) return;
+  const out = {};
+  for (const [k, s] of trimState) {
+    if (s.cursor === 0) continue;
+    out[k] = {
+      startMs: s.startMs,
+      endMs: s.endMs,
+      history: s.history,
+      cursor: s.cursor,
+    };
+  }
+  try {
+    localStorage.setItem(trimStorageKey, JSON.stringify(out));
+  } catch {
+    // quota — silent
+  }
+}
+
+function loadTrimState(bankId, bank) {
+  trimState.clear();
+  trimStorageKey = `ipa-trim:${bankId}`;
+  let raw = null;
+  try {
+    raw = localStorage.getItem(trimStorageKey);
+  } catch {
+    return;
+  }
+  if (!raw) return;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!parsed || typeof parsed !== "object") return;
+
+  const live = new Map();
+  const state = bank?.state?.phonemes ?? {};
+  for (const [pid, p] of Object.entries(state)) {
+    if (!p || !Array.isArray(p.takes)) continue;
+    const takes = new Map();
+    for (const t of p.takes) {
+      if (t && typeof t.id === "string" && typeof t.duration_ms === "number") {
+        takes.set(t.id, t.duration_ms);
+      }
+    }
+    live.set(pid, takes);
+  }
+
+  for (const [k, v] of Object.entries(parsed)) {
+    const [, pid, tid] = splitTrimKey(k);
+    const durationMs = live.get(pid)?.get(tid);
+    if (!durationMs) continue;
+    if (
+      !v ||
+      typeof v.startMs !== "number" ||
+      typeof v.endMs !== "number" ||
+      v.endMs > durationMs ||
+      v.startMs < 0 ||
+      v.startMs >= v.endMs
+    ) continue;
+    const history = Array.isArray(v.history) && v.history.length
+      ? v.history
+      : [{ startMs: 0, endMs: durationMs }];
+    const cursor = typeof v.cursor === "number"
+      ? Math.max(0, Math.min(v.cursor, history.length - 1))
+      : history.length - 1;
+    trimState.set(k, {
+      durationMs,
+      startMs: v.startMs,
+      endMs: v.endMs,
+      playheadMs: v.startMs,
+      history,
+      cursor,
+    });
+  }
+
+  if (selectedPhonemeId) refreshDirtyIndicator();
+}
+
+function splitTrimKey(k) {
+  // Key format: "<bankId>/<phonemeId>/<takeId>". Bank/phoneme/take IDs
+  // don't contain slashes in this app.
+  const parts = k.split("/");
+  return [parts[0], parts[1], parts.slice(2).join("/")];
+}
+
+function forgetTrim(bankId, phonemeId, takeId) {
+  trimState.delete(trimKey(bankId, phonemeId, takeId));
+  scheduleTrimSave();
+}
+
+window.addEventListener("beforeunload", flushTrimSave);
+
+function handleTrimAction(action, step) {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  let changed = false;
+
+  switch (action) {
+    case "jump-start":
+      state.playheadMs = 0;
+      break;
+    case "jump-end":
+      state.playheadMs = durationMs;
+      break;
+    case "nudge-playhead": {
+      const delta = Number(step);
+      state.playheadMs = Math.max(0, Math.min(durationMs, state.playheadMs + delta));
+      break;
+    }
+    case "set-start": {
+      const newStart = Math.min(state.playheadMs, state.endMs - 10);
+      if (newStart !== state.startMs) {
+        state.startMs = Math.max(0, newStart);
+        pushTrimHistory(state);
+        changed = true;
+      }
+      break;
+    }
+    case "set-end": {
+      const newEnd = Math.max(state.playheadMs, state.startMs + 10);
+      if (newEnd !== state.endMs) {
+        state.endMs = Math.min(durationMs, newEnd);
+        pushTrimHistory(state);
+        changed = true;
+      }
+      break;
+    }
+    case "undo":
+      changed = trimUndo(state);
+      break;
+    case "redo":
+      changed = trimRedo(state);
+      break;
+    case "reset":
+      trimReset(state);
+      changed = true;
+      break;
+    case "play-selection":
+      playRange(selectedTakeBuffer, state.startMs, state.endMs);
+      break;
+    case "save":
+      saveTrimAsNewTake();
+      return;
+  }
+
+  repaintTrim();
+  if (changed) refreshDirtyIndicator();
+}
+
+function nudgeNearestHandle(deltaMs) {
+  if (!selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  const pickStart =
+    state.playheadMs - state.startMs <= state.endMs - state.playheadMs;
+  if (pickStart) {
+    const v = Math.max(0, Math.min(state.endMs - 10, state.startMs + deltaMs));
+    if (v !== state.startMs) {
+      state.startMs = v;
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  } else {
+    const v = Math.max(state.startMs + 10, Math.min(durationMs, state.endMs + deltaMs));
+    if (v !== state.endMs) {
+      state.endMs = v;
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  }
+  repaintTrim();
+}
+
+async function saveTrimAsNewTake() {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const phonemeId = selectedPhonemeId;
+  const sourceTakeId = selectedTakeId;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, phonemeId, sourceTakeId, durationMs);
+  if (state.cursor === 0) {
+    showToast("No trim to save", "info");
+    return;
+  }
+  const { startMs, endMs } = state;
+  try {
+    const meta = await postTrim(bankId, phonemeId, sourceTakeId, startMs, endMs);
+    const phonemeState = currentBank.state.phonemes[phonemeId] ?? { takes: [], keeper_take: null };
+    phonemeState.takes = [
+      ...phonemeState.takes,
+      {
+        id: meta.id,
+        created_at: meta.created_at,
+        duration_ms: meta.duration_ms,
+        peak_db: meta.peak_db,
+        rms_db: meta.rms_db,
+        notes: "",
+        source_take_id: meta.source_take_id,
+      },
+    ];
+    currentBank.state.phonemes[phonemeId] = phonemeState;
+
+    forgetTrim(bankId, phonemeId, sourceTakeId);
+    renderPhonemeList(currentBank);
+    refreshDetailOnly();
+    showToast(`Saved ${meta.id} (${meta.duration_ms} ms)`, "success");
+  } catch (err) {
+    showToast(`Trim save failed: ${err.message}`, "error");
+  }
+}
+
+function refreshDirtyIndicator() {
+  if (!selectedPhonemeId || !currentBank) return;
+  const bankId = bankSelect.value;
+  const phonemeState = currentBank.state?.phonemes?.[selectedPhonemeId];
+  const takes = phonemeState?.takes ?? [];
+  for (const take of takes) {
+    const row = phonemeDetail.querySelector(`[data-take-id="${CSS.escape(take.id)}"] .takes-item__id`);
+    if (!row) continue;
+    const k = trimKey(bankId, selectedPhonemeId, take.id);
+    const dirty = (trimState.get(k)?.cursor ?? 0) > 0;
+    const prefix = dirty ? "● " : "";
+    const expected = `${prefix}${take.id}`;
+    if (row.textContent !== expected) row.textContent = expected;
+  }
+}
+
 const toastElement = ensureToast();
 
 async function init() {
@@ -102,6 +423,9 @@ async function init() {
     if (event.target?.dataset?.action === "close-new-bank-modal") closeNewBankModal();
   });
   newBankForm.addEventListener("submit", submitNewBank);
+  shortcutsModal.addEventListener("click", (event) => {
+    if (event.target?.dataset?.action === "close-shortcuts-modal") closeShortcutsModal();
+  });
   phonemeDetail.addEventListener("change", (e) => {
     if (e.target?.id === "ref-source") {
       localStorage.setItem("reference_source", e.target.value);
@@ -174,6 +498,7 @@ async function loadBank(id) {
   try {
     const bank = await getBank(id);
     currentBank = bank;
+    loadTrimState(id, bank);
     localStorage.setItem("last_bank_id", id);
     renderPrivacyBadge(bank.config.privacy);
     renderGitignoreBanner(bank.gitignore);
@@ -255,7 +580,7 @@ function renderPhonemeList(bank) {
     li.innerHTML = `
       <span class="phoneme-item__glyph" aria-hidden="true">${glyph}</span>
       <span class="phoneme-item__ipa">${escapeHtml(phoneme.ipa)}</span>
-      <span class="phoneme-item__example">${escapeHtml(phoneme.example ?? "")}</span>
+      <span class="phoneme-item__example">${renderExamples(phoneme.example, { limit: 1 })}</span>
     `;
     li.addEventListener("click", () => selectPhoneme(phoneme.id));
     phonemeList.appendChild(li);
@@ -332,7 +657,7 @@ function renderDetail(phoneme) {
   phonemeDetail.innerHTML = `
     <div class="phoneme-detail__header">
       <span class="phoneme-detail__ipa">${escapeHtml(phoneme.ipa)}</span>
-      <span class="phoneme-detail__example">${escapeHtml(phoneme.example ?? "")}</span>
+      <span class="phoneme-detail__example">${renderExamples(phoneme.example)}</span>
       <div class="reference-controls">
         <label class="ref-source-label">Reference
           <select id="ref-source" class="ref-source" aria-label="Reference clip source">${refOpts}</select>
@@ -352,7 +677,24 @@ function renderDetail(phoneme) {
     ${takes.length === 0
       ? '<p class="placeholder">No takes yet. Press R (or click Record) to record one.</p>'
       : `<ul class="takes-list">${takes.map((t) => renderTakeRow(t, keeperTakeId)).join("")}</ul>
-         <canvas class="take-waveform" height="80" aria-label="Waveform of selected take"></canvas>`}
+         <canvas class="take-waveform" height="80" aria-label="Waveform of selected take"></canvas>
+         <div class="trim-bar" role="toolbar" aria-label="Trim controls">
+           <button class="trim-btn" data-trim-action="jump-start" title="Jump to start (Home)" type="button">⏮</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="-100" title="Back 100 ms (Shift+←)" type="button">«</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="-10" title="Back 10 ms (←)" type="button">‹</button>
+           <button class="trim-btn" data-trim-action="set-start" title="Set trim start ([)" type="button">[</button>
+           <button class="trim-btn trim-btn--play" data-trim-action="play-selection" title="Play selection (P)" type="button">▶ sel</button>
+           <button class="trim-btn" data-trim-action="set-end" title="Set trim end (])" type="button">]</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="10" title="Forward 10 ms (→)" type="button">›</button>
+           <button class="trim-btn" data-trim-action="nudge-playhead" data-step="100" title="Forward 100 ms (Shift+→)" type="button">»</button>
+           <button class="trim-btn" data-trim-action="jump-end" title="Jump to end (End)" type="button">⏭</button>
+           <span class="trim-bar__spacer"></span>
+           <button class="trim-btn" data-trim-action="undo" title="Undo (Cmd/Ctrl+Z)" type="button">↶</button>
+           <button class="trim-btn" data-trim-action="redo" title="Redo (Cmd/Ctrl+Shift+Z)" type="button">↷</button>
+           <button class="trim-btn" data-trim-action="reset" title="Reset trim" type="button">✕</button>
+           <span class="trim-bar__readout" data-trim-readout>0 / 0 ms</span>
+           <button class="trim-btn trim-btn--save" data-trim-action="save" title="Save as new take (S)" type="button">💾 Save</button>
+         </div>`}
   `;
 }
 
@@ -373,6 +715,8 @@ function renderTakeRow(take, keeperTakeId) {
   const isSelected = take.id === selectedTakeId;
   const isThisPlaying = take.id === playingTakeId;
   const playGlyph = isThisPlaying ? "■" : "▶";
+  const bankId = bankSelect.value;
+  const dirty = (trimState.get(trimKey(bankId, selectedPhonemeId, take.id))?.cursor ?? 0) > 0;
   const classes = [
     "takes-item",
     isKeeper ? "takes-item--keeper" : "",
@@ -383,7 +727,7 @@ function renderTakeRow(take, keeperTakeId) {
   return `
     <li class="${classes}" data-take-id="${escapeHtml(take.id)}">
       <button class="takes-btn takes-btn--play" data-action="play" type="button" aria-label="Play ${escapeHtml(take.id)}">${playGlyph}</button>
-      <span class="takes-item__id">${escapeHtml(take.id)}</span>
+      <span class="takes-item__id">${dirty ? "● " : ""}${escapeHtml(take.id)}</span>
       <span class="takes-item__duration">${take.duration_ms} ms</span>
       <span class="takes-item__peak">peak ${formatDb(take.peak_db)}</span>
       <span class="takes-item__rms">rms ${formatDb(take.rms_db)}</span>
@@ -433,6 +777,15 @@ function handleKeyDown(event) {
     if (event.key === "Escape") {
       event.preventDefault();
       closeNewBankModal();
+    }
+    return;
+  }
+
+  // Shortcuts cheatsheet — Escape closes; everything else suppressed.
+  if (!shortcutsModal.hidden) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeShortcutsModal();
     }
     return;
   }
@@ -508,6 +861,89 @@ function handleKeyDown(event) {
     if (!currentBank) return;
     event.preventDefault();
     runExport();
+    return;
+  }
+
+  if (event.key === "?") {
+    event.preventDefault();
+    openShortcutsModal();
+    return;
+  }
+
+  if (!selectedTakeId || !selectedTakeBuffer) return;
+
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    const dir = event.key === "ArrowLeft" ? -1 : 1;
+    const step = event.shiftKey ? 100 : 10;
+    event.preventDefault();
+    if (event.altKey) {
+      nudgeNearestHandle(dir * step);
+    } else {
+      handleTrimAction("nudge-playhead", String(dir * step));
+    }
+    return;
+  }
+
+  if (event.key === "Home") {
+    event.preventDefault();
+    handleTrimAction("jump-start");
+    return;
+  }
+
+  if (event.key === "End") {
+    event.preventDefault();
+    handleTrimAction("jump-end");
+    return;
+  }
+
+  if (event.key === "[") {
+    event.preventDefault();
+    handleTrimAction("set-start");
+    return;
+  }
+
+  if (event.key === "]") {
+    event.preventDefault();
+    handleTrimAction("set-end");
+    return;
+  }
+
+  if (event.key === ",") {
+    event.preventDefault();
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    state.playheadMs = state.startMs;
+    repaintTrim();
+    return;
+  }
+
+  if (event.key === ".") {
+    event.preventDefault();
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    state.playheadMs = state.endMs;
+    repaintTrim();
+    return;
+  }
+
+  if (event.key === "p" || event.key === "P") {
+    event.preventDefault();
+    handleTrimAction("play-selection");
+    return;
+  }
+
+  if ((event.key === "s" || event.key === "S") && !event.metaKey && !event.ctrlKey) {
+    event.preventDefault();
+    handleTrimAction("save");
+    return;
+  }
+
+  if ((event.metaKey || event.ctrlKey) && (event.key === "z" || event.key === "Z")) {
+    event.preventDefault();
+    if (event.shiftKey) handleTrimAction("redo");
+    else handleTrimAction("undo");
     return;
   }
 }
@@ -728,6 +1164,19 @@ function closeNewBankModal() {
   newBankButton.focus();
 }
 
+function openShortcutsModal() {
+  shortcutsModal.hidden = false;
+  document.body.classList.add("modal-open");
+  shortcutsModal.querySelector(".modal__btn")?.focus();
+}
+
+function closeShortcutsModal() {
+  shortcutsModal.hidden = true;
+  if (exportModal.hidden && privacyModal.hidden && newBankModal.hidden) {
+    document.body.classList.remove("modal-open");
+  }
+}
+
 function populateInventorySelect() {
   const currentBanks = Array.from(bankSelect.options)
     .map((o) => o.value)
@@ -878,6 +1327,18 @@ function escapeHtml(value) {
   })[c]);
 }
 
+// Turns "[th]in" into "<mark>th</mark>in" (HTML-escaped first).
+// Brackets have no meaning in HTML, so escape-then-replace is safe.
+function markupExample(str) {
+  return escapeHtml(str).replace(/\[([^\]]+)\]/g, "<mark>$1</mark>");
+}
+
+function renderExamples(example, { limit = Infinity } = {}) {
+  if (example == null || example === "") return "";
+  const list = Array.isArray(example) ? example : [example];
+  return list.slice(0, limit).map(markupExample).join(", ");
+}
+
 async function grantMicAndStartMeter() {
   micGrantButton.disabled = true;
   micGrantButton.textContent = "Waiting…";
@@ -1000,6 +1461,13 @@ function applyTakeLocally(phonemeId, take) {
 }
 
 function handleDetailClick(event) {
+  const trimBtn = event.target.closest("[data-trim-action]");
+  if (trimBtn) {
+    event.preventDefault();
+    handleTrimAction(trimBtn.dataset.trimAction, trimBtn.dataset.step);
+    return;
+  }
+
   const actionEl = event.target.closest("[data-action]");
   const action = actionEl?.dataset.action;
 
@@ -1131,6 +1599,7 @@ async function doDelete(takeId) {
 
   try {
     await deleteTake(bankId, phonemeId, takeId);
+    forgetTrim(bankId, phonemeId, takeId);
     showToast(`Deleted ${takeId}`, "success");
     if (selectedTakeId) paintWaveformForSelectedTake();
   } catch (err) {
@@ -1156,22 +1625,156 @@ async function paintWaveformForSelectedTake() {
   const canvas = phonemeDetail.querySelector(".take-waveform");
   if (!canvas) return;
   sizeCanvasToDisplay(canvas);
+
   const bankId = bankSelect.value;
   const phonemeId = selectedPhonemeId;
   const takeId = selectedTakeId;
-  let buffer;
+
+  let arrayBuffer;
   try {
-    buffer = await getTakeWav(bankId, phonemeId, takeId);
+    arrayBuffer = await getTakeWav(bankId, phonemeId, takeId);
   } catch {
+    selectedTakeBuffer = null;
+    selectedTakeArrayBuffer = null;
     return;
   }
-  // Race: selection may have moved while fetching.
   if (selectedPhonemeId !== phonemeId || selectedTakeId !== takeId) return;
+
+  let audioBuffer;
   try {
-    await renderWaveform(canvas, buffer);
+    audioBuffer = await decodeBuffer(arrayBuffer);
+  } catch {
+    selectedTakeBuffer = null;
+    return;
+  }
+  if (selectedPhonemeId !== phonemeId || selectedTakeId !== takeId) return;
+
+  selectedTakeArrayBuffer = arrayBuffer;
+  selectedTakeBuffer = audioBuffer;
+
+  try {
+    await renderWaveform(canvas, arrayBuffer);
   } catch {
     // decodeAudioData can throw on odd inputs; silent.
   }
+  paintTrimOverlay(canvas);
+  attachTrimPointerHandlers(canvas);
+  updateTrimReadout();
+}
+
+function paintTrimOverlay(canvas) {
+  if (!selectedTakeId || !selectedPhonemeId || !selectedTakeBuffer) return;
+  const bankId = bankSelect.value;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+
+  const ctx2d = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  const xStart = Math.round((state.startMs / durationMs) * w);
+  const xEnd = Math.round((state.endMs / durationMs) * w);
+  const xHead = Math.round((state.playheadMs / durationMs) * w);
+
+  ctx2d.fillStyle = "rgba(0,0,0,0.45)";
+  if (xStart > 0) ctx2d.fillRect(0, 0, xStart, h);
+  if (xEnd < w) ctx2d.fillRect(xEnd, 0, w - xEnd, h);
+
+  ctx2d.fillStyle = "#f5a623";
+  ctx2d.fillRect(Math.max(0, xStart - 1), 0, 3, h);
+  ctx2d.fillRect(Math.min(w - 3, xEnd - 1), 0, 3, h);
+
+  const headX = Math.max(0, Math.min(w - 3, xHead - 1));
+  // White outline so the red line is visible over both the orange
+  // handles and the dimmed region.
+  ctx2d.fillStyle = "#ffffff";
+  ctx2d.fillRect(headX, 0, 4, h);
+  ctx2d.fillStyle = "#ff3b6b";
+  ctx2d.fillRect(headX + 1, 0, 2, h);
+}
+
+function repaintTrim() {
+  const canvas = phonemeDetail.querySelector(".take-waveform");
+  if (!canvas || !selectedTakeBuffer) return;
+  renderWaveformFromBuffer(canvas, selectedTakeBuffer);
+  paintTrimOverlay(canvas);
+  updateTrimReadout();
+}
+
+function updateTrimReadout() {
+  const readout = phonemeDetail.querySelector("[data-trim-readout]");
+  if (!readout || !selectedTakeBuffer) return;
+  const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+  const bankId = bankSelect.value;
+  const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+  readout.textContent = `${state.startMs} / ${state.endMs} ms (head ${state.playheadMs})`;
+}
+
+function attachTrimPointerHandlers(canvas) {
+  if (canvas.dataset.trimBound === "1") return;
+  canvas.dataset.trimBound = "1";
+  let dragging = null;
+
+  function msFromEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const durationMs = Math.round((selectedTakeBuffer?.duration ?? 0) * 1000);
+    return Math.round(ratio * durationMs);
+  }
+
+  function hitTest(ms, state) {
+    const tolerance = Math.max(20, Math.round(state.durationMs * 0.02));
+    // Grab a handle only when clicking just INSIDE the trim — past the
+    // handle is still the playhead, so the user can move the playhead
+    // outside the selection to extend the trim.
+    if (ms >= state.startMs && ms - state.startMs <= tolerance) return "start";
+    if (ms <= state.endMs && state.endMs - ms <= tolerance) return "end";
+    return "playhead";
+  }
+
+  function applyDrag(ms, state) {
+    if (dragging === "start") {
+      state.startMs = Math.max(0, Math.min(state.endMs - 10, ms));
+    } else if (dragging === "end") {
+      state.endMs = Math.min(state.durationMs, Math.max(state.startMs + 10, ms));
+    } else {
+      state.playheadMs = Math.max(0, Math.min(state.durationMs, ms));
+    }
+    repaintTrim();
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (!selectedTakeBuffer) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    const ms = msFromEvent(e);
+    dragging = hitTest(ms, state);
+    canvas.setPointerCapture(e.pointerId);
+    applyDrag(ms, state);
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    applyDrag(msFromEvent(e), state);
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    if (!dragging) return;
+    const bankId = bankSelect.value;
+    const durationMs = Math.round(selectedTakeBuffer.duration * 1000);
+    const state = getTrim(bankId, selectedPhonemeId, selectedTakeId, durationMs);
+    const wasHandleDrag = dragging === "start" || dragging === "end";
+    dragging = null;
+    try { canvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    if (wasHandleDrag) {
+      pushTrimHistory(state);
+      refreshDirtyIndicator();
+    }
+  });
 }
 
 function sizeCanvasToDisplay(canvas) {

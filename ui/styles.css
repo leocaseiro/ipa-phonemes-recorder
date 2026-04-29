@@ -665,6 +665,16 @@ body {
   font-style: italic;
 }
 
+.phoneme-detail__example mark,
+.phoneme-item__example mark {
+  background: transparent;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
+
 .phoneme-detail__meta {
   display: grid;
   grid-template-columns: 120px 1fr;
@@ -951,4 +961,115 @@ body {
 
 .toast--error {
   border-color: var(--bad);
+}
+
+/* --- Trim bar ------------------------------------------------------ */
+
+.trim-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 4px;
+  margin-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.trim-bar__spacer {
+  flex: 1 1 auto;
+}
+
+.trim-bar__readout {
+  font-family: monospace;
+  font-size: 11px;
+  opacity: 0.7;
+  padding: 0 6px;
+}
+
+.trim-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: inherit;
+  padding: 2px 8px;
+  min-width: 28px;
+  cursor: pointer;
+  font: inherit;
+  border-radius: 3px;
+}
+
+.trim-btn:hover {
+  background: color-mix(in oklab, var(--accent) 10%, transparent);
+}
+
+.trim-btn:active {
+  background: color-mix(in oklab, var(--accent) 20%, transparent);
+}
+
+.trim-btn--play {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.trim-btn--save {
+  border-color: var(--good);
+  color: var(--good);
+  font-weight: 600;
+}
+
+.take-waveform {
+  cursor: crosshair;
+  width: 100%;
+  touch-action: none;
+}
+
+/* --- Shortcuts cheatsheet ----------------------------------------- */
+
+.shortcuts-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.shortcuts-table th,
+.shortcuts-table td {
+  text-align: left;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.shortcuts-table th {
+  font-weight: 600;
+  color: var(--fg-muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.shortcuts-table td:first-child {
+  white-space: nowrap;
+  font-family: monospace;
+  color: var(--accent);
+}
+
+.shortcuts-table kbd {
+  display: inline-block;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--bg-inset);
+  font: inherit;
+  font-size: 11px;
+  margin: 0 1px;
+}
+
+.shortcuts-table__group {
+  font-weight: 600;
+  color: var(--accent);
+  padding-top: 12px !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: transparent;
 }

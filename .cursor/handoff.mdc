@@ -1,0 +1,11 @@
+---
+description: >-
+  Create a session handoff document so work can continue in a new session or
+  with another agent. Use when just saved a plan or spec, just raised or
+  merged a PR, ending a session, context-switching, or told to hand off /
+  continue later.
+globs: []
+alwaysApply: false
+---
+
+[Skill handoff](.claude/skills/handoff/SKILL.md)

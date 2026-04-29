@@ -2,52 +2,449 @@
   "name": "Aussie English — Leo",
   "locale": "en-AU",
   "speaker": "Leo Caseiro",
-  "privacy": "private",
+  "privacy": "public",
   "target_lufs": -16,
   "phonemes": [
-    { "id": "ai", "ipa": "aɪ", "example": "price", "loopable": true, "category": "diphthong" },
-    { "id": "au", "ipa": "aʊ", "example": "mouth", "loopable": true, "category": "diphthong" },
-    { "id": "b", "ipa": "b", "example": "bed", "loopable": false, "category": "consonant" },
-    { "id": "d", "ipa": "d", "example": "day", "loopable": false, "category": "consonant" },
-    { "id": "dzh", "ipa": "dʒ", "example": "judge", "loopable": false, "category": "consonant" },
-    { "id": "e", "ipa": "e", "example": "dress", "loopable": true, "category": "vowel" },
-    { "id": "e_schwa", "ipa": "eə", "example": "there", "loopable": true, "category": "diphthong" },
-    { "id": "ey", "ipa": "eɪ", "example": "face", "loopable": true, "category": "diphthong" },
-    { "id": "f", "ipa": "f", "example": "fish", "loopable": true, "category": "consonant" },
-    { "id": "g", "ipa": "g", "example": "go", "loopable": false, "category": "consonant" },
-    { "id": "h", "ipa": "h", "example": "house", "loopable": true, "category": "consonant" },
-    { "id": "ee", "ipa": "iː", "example": "see", "loopable": true, "category": "vowel" },
-    { "id": "j", "ipa": "j", "example": "yes", "loopable": true, "category": "consonant" },
-    { "id": "ju", "ipa": "juː", "example": "cute", "loopable": true, "category": "diphthong" },
-    { "id": "k", "ipa": "k", "example": "kite", "loopable": false, "category": "consonant" },
-    { "id": "ks", "ipa": "ks", "example": "box", "loopable": true, "category": "consonant" },
-    { "id": "l", "ipa": "l", "example": "like", "loopable": true, "category": "consonant" },
-    { "id": "m", "ipa": "m", "example": "man", "loopable": true, "category": "consonant" },
-    { "id": "n", "ipa": "n", "example": "no", "loopable": true, "category": "consonant" },
-    { "id": "ow", "ipa": "oʊ", "example": "goat", "loopable": true, "category": "diphthong" },
-    { "id": "p", "ipa": "p", "example": "pen", "loopable": false, "category": "consonant" },
-    { "id": "r", "ipa": "r", "example": "red", "loopable": true, "category": "consonant" },
-    { "id": "s", "ipa": "s", "example": "see", "loopable": true, "category": "consonant" },
-    { "id": "t", "ipa": "t", "example": "ten", "loopable": false, "category": "consonant" },
-    { "id": "ch", "ipa": "tʃ", "example": "church", "loopable": false, "category": "consonant" },
-    { "id": "oo", "ipa": "uː", "example": "goose", "loopable": true, "category": "vowel" },
-    { "id": "v", "ipa": "v", "example": "very", "loopable": true, "category": "consonant" },
-    { "id": "w", "ipa": "w", "example": "we", "loopable": true, "category": "consonant" },
-    { "id": "z", "ipa": "z", "example": "zoo", "loopable": true, "category": "consonant" },
-    { "id": "ae", "ipa": "æ", "example": "cat", "loopable": true, "category": "vowel" },
-    { "id": "th_vd", "ipa": "ð", "example": "this", "loopable": true, "category": "consonant" },
-    { "id": "ng", "ipa": "ŋ", "example": "sing", "loopable": true, "category": "consonant" },
-    { "id": "ah", "ipa": "ɑː", "example": "start", "loopable": true, "category": "vowel" },
-    { "id": "o_brit", "ipa": "ɒ", "example": "lot", "loopable": true, "category": "vowel" },
-    { "id": "oi", "ipa": "ɔɪ", "example": "choice", "loopable": true, "category": "diphthong" },
-    { "id": "or_caught", "ipa": "ɔː", "example": "caught", "loopable": true, "category": "vowel" },
-    { "id": "e_near", "ipa": "ɛə", "example": "Mary", "loopable": true, "category": "diphthong" },
-    { "id": "er", "ipa": "ɜː", "example": "nurse", "loopable": true, "category": "vowel" },
-    { "id": "ih", "ipa": "ɪ", "example": "kit", "loopable": true, "category": "vowel" },
-    { "id": "i_schwa", "ipa": "ɪə", "example": "near", "loopable": true, "category": "diphthong" },
-    { "id": "sh", "ipa": "ʃ", "example": "ship", "loopable": true, "category": "consonant" },
-    { "id": "u_short", "ipa": "ʊ", "example": "foot", "loopable": true, "category": "vowel" },
-    { "id": "uh", "ipa": "ʌ", "example": "strut", "loopable": true, "category": "vowel" },
-    { "id": "th_vl", "ipa": "θ", "example": "thin", "loopable": true, "category": "consonant" }
-  ]
+    {
+      "id": "ai",
+      "ipa": "aɪ",
+      "example": [
+        "pr[i]ce",
+        "tr[y]",
+        "h[igh]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "au",
+      "ipa": "aʊ",
+      "example": [
+        "m[ou]th",
+        "n[ow]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "b",
+      "ipa": "b",
+      "example": "[b]ed",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "d",
+      "ipa": "d",
+      "example": "[d]ay",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "dzh",
+      "ipa": "dʒ",
+      "example": [
+        "[j]udge",
+        "[g]iant"
+      ],
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "e",
+      "ipa": "e",
+      "example": [
+        "dr[e]ss",
+        "b[e]d"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "e_schwa",
+      "ipa": "eə",
+      "example": [
+        "th[ere]",
+        "h[air]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "ey",
+      "ipa": "eɪ",
+      "example": [
+        "f[a]ce",
+        "d[ay]",
+        "r[ai]n"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "f",
+      "ipa": "f",
+      "example": [
+        "[f]ish",
+        "gra[ph]"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "g",
+      "ipa": "g",
+      "example": "[g]o",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "h",
+      "ipa": "h",
+      "example": "[h]ouse",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ee",
+      "ipa": "iː",
+      "example": [
+        "s[ee]",
+        "b[ea]ch"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "j",
+      "ipa": "j",
+      "example": [
+        "[y]es",
+        "[u]se"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ju",
+      "ipa": "juː",
+      "example": [
+        "c[u]te",
+        "f[ew]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "k",
+      "ipa": "k",
+      "example": [
+        "[k]ite",
+        "[c]at"
+      ],
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "ks",
+      "ipa": "ks",
+      "example": [
+        "bo[x]",
+        "si[x]"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "l",
+      "ipa": "l",
+      "example": "[l]ike",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "m",
+      "ipa": "m",
+      "example": "[m]an",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "n",
+      "ipa": "n",
+      "example": "[n]o",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ow",
+      "ipa": "oʊ",
+      "example": "g[oa]t",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "p",
+      "ipa": "p",
+      "example": "[p]en",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "r",
+      "ipa": "r",
+      "example": "[r]ed",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "s",
+      "ipa": "s",
+      "example": "[s]ee",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "t",
+      "ipa": "t",
+      "example": "[t]en",
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "ch",
+      "ipa": "tʃ",
+      "example": [
+        "[ch]urch",
+        "wa[tch]"
+      ],
+      "loopable": false,
+      "category": "consonant"
+    },
+    {
+      "id": "oo",
+      "ipa": "uː",
+      "example": [
+        "g[oo]se",
+        "bl[ue]"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "v",
+      "ipa": "v",
+      "example": "[v]ery",
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "w",
+      "ipa": "w",
+      "example": [
+        "[w]e",
+        "[wh]at"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "z",
+      "ipa": "z",
+      "example": [
+        "[z]oo",
+        "ro[s]e"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ae",
+      "ipa": "æ",
+      "example": [
+        "c[a]t",
+        "tr[a]p"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "th_vd",
+      "ipa": "ð",
+      "example": [
+        "[th]is",
+        "bro[th]er"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ng",
+      "ipa": "ŋ",
+      "example": [
+        "si[ng]",
+        "ri[ng]"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "ah",
+      "ipa": "ɑː",
+      "example": [
+        "st[ar]t",
+        "f[a]ther"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "o_brit",
+      "ipa": "ɒ",
+      "example": [
+        "l[o]t",
+        "cl[o]ck"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "oi",
+      "ipa": "ɔɪ",
+      "example": [
+        "ch[oi]ce",
+        "b[oy]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "or_caught",
+      "ipa": "ɔː",
+      "example": [
+        "c[augh]t",
+        "s[aw]"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "e_near",
+      "ipa": "ɛə",
+      "example": "M[ar]y",
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "er",
+      "ipa": "ɜː",
+      "example": [
+        "n[ur]se",
+        "b[ir]d"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "ih",
+      "ipa": "ɪ",
+      "example": [
+        "k[i]t",
+        "b[i]g"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "i_schwa",
+      "ipa": "ɪə",
+      "example": [
+        "n[ear]",
+        "h[ere]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "sh",
+      "ipa": "ʃ",
+      "example": [
+        "[sh]ip",
+        "[s]ugar"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "u_short",
+      "ipa": "ʊ",
+      "example": [
+        "f[oo]t",
+        "p[u]ll"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "uh",
+      "ipa": "ʌ",
+      "example": [
+        "str[u]t",
+        "c[u]p"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "th_vl",
+      "ipa": "θ",
+      "example": [
+        "[th]in",
+        "ba[th]"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "schwa",
+      "ipa": "ə",
+      "example": [
+        "[a]bout",
+        "teach[er]"
+      ],
+      "loopable": true,
+      "category": "vowel"
+    },
+    {
+      "id": "zh",
+      "ipa": "ʒ",
+      "example": [
+        "mea[s]ure",
+        "vi[s]ion"
+      ],
+      "loopable": true,
+      "category": "consonant"
+    },
+    {
+      "id": "oh",
+      "ipa": "əʊ",
+      "example": [
+        "g[oa]t",
+        "sh[ow]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    },
+    {
+      "id": "oo_er",
+      "ipa": "ʊə",
+      "example": [
+        "c[ure]",
+        "t[our]"
+      ],
+      "loopable": true,
+      "category": "diphthong"
+    }
+  ],
+  "attribution": "Leo Caseiro"
 }

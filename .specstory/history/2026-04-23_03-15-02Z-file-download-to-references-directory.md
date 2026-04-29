@@ -3338,4 +3338,2201 @@ Alternative approaches include:
 - Not using **or_caught** or **o_brit** as they don't fit
 
 The core fix is to map **e_schwa** to a distinct file to prevent it from sounding like **e** or **ey**. The user corrects that **a** (ai-vmgin8) is "price," not "air."  
-**** (oi) is a different</details></think>
+**** (oi) is a different sound.  
+Using **horseshoe-1inthj0** () is unsuitable for **e_schwa**.  
+**open_o-1olavce** () is a lower vowel like "thought," but still not **e**.
+
+Since **epsilon-yoyztd** would create a 3-way duplicate with **e**, **e_near**, and **e_schwa**, the real solution is:
+
+- Remove **e_schwa** from the bank and explain that without a separate clip, you cannot distinctly teach **e** vs **e**, OR  
+- Map **e_schwa** to **mid_central** to emphasize the schwa part of the diphthong (weak second element)  even if it sounds unusual, - **e_schwa** should map to **mid_central-gqxn5h.mp3** for a distinct schwa sound, even if not phonetically perfect.
+- Mapping **e_schwa** to **epsilon-yoyztd.mp3** causes duplication with **e** and **e_near**, all sounding like "let".
+- Since **e** and **e_near** are already using **epsilon**, and **e_schwa** must be distinct, the best option is to remove **e_schwa** or use **mid_central** to avoid duplication and ensure clarity. The user noted that e sounds like e, so the mapping from e-qxx7n8 must be broken. Using **epsilon** for e_schwa would make it sound like e (dress/let), which is still incorrect. To distinguish e_schwa from ey (e), it should not use e-qxx7n8. 
+
+Using **epsilon-yoyztd** for e_schwa creates duplication with e and e_near, all sounding like "let". 
+
+- **e_schwa**  `ah-1f3x3pk.mp3` () - potentially different from e and epsilon, but user associates it with "father", which is incorrect.</details></think>
+
+_**Agent (composer-2)**_
+
+Using the same Vocabulary clip for both: `e_schwa` and `ey` were mapped to `e-qxx7n8.mp3` — the guide labels that file as e / eɪ ("late, break, say"), so it’s the FACE diphthong, not a distinct eə. Remapping `e_schwa` to the DRESS/ɛ clip (`epsilon-yoyztd.mp3`) so it’s no longer identical to eɪ.
+
+
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/seeds/phoneme_reference_files.json</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/seeds/phoneme_reference_files.json</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Now e, e_schwa, and e_near all use epsilon, with three slots sharing the same reference.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -c "
+import json
+from pathlib import Path
+from server.references import load_phoneme_reference_files
+c = json.loads(Path('banks/en-au-leo/config.json').read_text())
+mp = load_phoneme_reference_files(Path('server/seeds'))
+ref = Path('references')
+for p in c['phonemes']:
+    pid = p['id']
+    f = ref / mp[pid]
+    assert f.is_file(), (pid, mp[pid])
+m = {p['id']: p['ipa'] for p in c['phonemes']}
+print('e_schwa', mp.get('e_schwa'), 'ey', mp.get('ey'), 'same file?', mp.get('e_schwa')==mp.get('ey'))
+"
+</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -c "
+import json
+from pathlib import Path
+from server.references import load_phoneme_reference_files
+c = json.loads(Path('banks/en-au-leo/config.json').read_text())
+mp = load_phoneme_reference_files(Path('server/seeds'))
+ref = Path('references')
+for p in c['phonemes']:
+    pid = p['id']
+    f = ref / mp[pid]
+    assert f.is_file(), (pid, mp[pid])
+m = {p['id']: p['ipa'] for p in c['phonemes']}
+print('e_schwa', mp.get('e_schwa'), 'ey', mp.get('ey'), 'same file?', mp.get('e_schwa')==mp.get('ey'))
+"
+
+```
+
+```
+e_schwa epsilon-yoyztd.mp3 ey e-qxx7n8.mp3 same file? False
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+Here is what was going on:
+
+**On [Vocabulary.com’s IPA page](https://www.vocabulary.com/resources/ipa-pronunciation/), the MP3 `e-qxx7n8` is the row for **e / eɪ** (“late, break, say”)** — that is the **FACE** diphthong, not a separate **eə** (SQUARE-type) diphthong. We had both **`ey` (eɪ)** and **`e_schwa` (eə)** pointing at that file, so they **had to** sound the same in the app.
+
+**Change made:** `e_schwa` is remapped to **`epsilon-yoyztd.mp3`**, the **ɛ** clip (“let, best”), so the reference is **not** the FACE clip. **`ey`** stays on **`e-qxx7n8.mp3`** (eɪ).
+
+**Caveat:** Vocabulary’s tables don’t offer a true **eə** diphthong (they’re built for [general American English](https://www.vocabulary.com/resources/ipa-pronunciation/)). **ɛ (epsilon)** is a stand-in for a **front, non-diphthongal** quality so it’s **separate** from eɪ. Your **`e`**, **`e_schwa`**, and **`e_near`** rows now all use that same ε file, so they **share** one reference — only **`ey`** uses the FACE file.
+
+If you need **`eə` to be its own** timbre, you’d need another source or a custom recording; if **`e` / eə / ɛə** all sound too alike with ε, the next step is to drop or merge some rows, not a better match on that CDN.
+
+---
+
+_**User**_
+
+Ok, this one sounds more UK/AUS
+
+https://elc.polyu.edu.hk/sounds/pron/ipa/EEEE.mp3 
+
+From https://elc.polyu.edu.hk/sounds/lesson1.htm 
+
+Can we scrappe all their sounds, and have multiple references in our app?
+
+---
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants to scrape or download all IPA sound files from the PolyU ELC website at https://elc.polyu.edu.hk/. The user wants to scrape or download all IPA sound files from the PolyU ELC website at https://elc.polyu.edu.hk/.
+
+The task involves:
+- Discovering the URL structure for all sounds on the site (e.g., https://elc.polyu.edu.hk/sounds/pron/ipa/EEEE.mp3)
+- Writing a scraper script or fetching a listing to download the files
+- Extending the app to support multiple references (e.g., bank config or reference sets like vocabulary, polyu, wikimedia)
+
+Architecture considerations:
+- A phoneme should have references like `["polyu/EEEE", "vocabulary/..."]` The user wants to support multiple references for each phoneme, allowing users to switch between sources like PolyU, vocabulary, or Wikimedia. This includes storing multiple files per phoneme and enabling selection in the UI.
+
+- Fetch lesson pages or use common URL patterns to discover MP3 links
+- Download files into directories such as `references/polyu/` or `references/sources/polyu/`
+- Extend the API to support multiple references, e.g., `GET /api/banks/{bank}/phonemes/{id}/reference?source=polyu`
+- Store reference sets in configuration like `{ "polyu": { "e_schwa": "e.mp3" } }`</details></think>
+
+_**Agent (composer-2)**_
+
+Exploring the PolyU site’s URL pattern and our reference API so we can add a download script and multiple reference sources.
+
+
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch">
+<details>
+<summary>Tool use: **web_fetch**</summary>
+
+
+Parameters:
+
+```json
+{
+  "url": "https://elc.polyu.edu.hk/sounds/lesson1.htm"
+}
+```
+Result:
+
+```json
+{
+  "markdown": "Sounds Pronunciation\n\n- [How to say it - /iː/ \u0026 /\u0026#618;/](https://elc.polyu.edu.hk/sounds/lesson1.htm)\n- [Say It - /iː/ \u0026 /\u0026#618;/](https://elc.polyu.edu.hk/sounds/lesson1-1.htm)\n- [How to say it - /ʊ/ \u0026 /u\u0026#720;/](https://elc.polyu.edu.hk/sounds/lesson1-2.htm)\n- [Say It - /ʊ/ \u0026 /u\u0026#720;/](https://elc.polyu.edu.hk/sounds/lesson1-3.htm)\n\n## How to say it - /iː/ and /ɪ/ sounds\n\n## Introduction\n\n### /iː/ sound\n\nWhen you say this word, your tongue moves up and forward and your lips stretch wide. See below for an animation of how your mouth and lips should move to make this sound.\n\n### /iː/ and /ɪ/ sounds\n\nWhen you say /ɪ/ sound, your tongue moves up and forward and your lips stretch quite wide, but not as far as in /iː/.\n\n## Video of Mouth\n\nFollow the instructions as they appear in the video.\n\n### /iː/ sound\n\nYour browser does not support the video tag.\n\n### /ɪ/ sound\n\nYour browser does not support the video tag.\n\n## Pronunciation Tips\n\nYour browser does not support the audio element.",
+  "url": "https://elc.polyu.edu.hk/sounds/lesson1.htm"
+}
+```
+User decision: **accepted**
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="web_fetch"><details>
+<summary>Tool use: **web_fetch**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "glob": "*.{js,html}",
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder",
+  "pattern": "reference"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder",
+  "pattern": "reference",
+  "topFiles": [
+    {
+      "matchCount": 5,
+      "uri": "./ui/main.js"
+    },
+    {
+      "matchCount": 1,
+      "uri": "./ui/api.js"
+    }
+  ],
+  "totalFiles": 2,
+  "totalMatches": 6
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL -A "ipa-phonemes-recorder/0.1 (local; polyu sound index)" "https://elc.polyu.edu.hk/sounds/lesson1.htm" | rg -o 'https?://[^"<> ]+\.mp3' | sort -u | head -50</summary>
+
+```bash
+curl -fsSL -A "ipa-phonemes-recorder/0.1 (local; polyu sound index)" "https://elc.polyu.edu.hk/sounds/lesson1.htm" | rg -o 'https?://[^"<> ]+\.mp3' | sort -u | head -50
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/api.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+The curl command for lesson1.htm did not return an MP3 file; it may be embedded in JavaScript or use a different format.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1-1.htm" | rg -oE '(src|href)="[^"]+\.mp3"' | head -20
+curl -fsSL "https://elc.polyu.edu.hk/sounds/pron/ipa/EEEE.mp3" -o /tmp/test_polyu.mp3 -w "%{http_code} %{size_download}\n"
+file /tmp/test_polyu.mp3</summary>
+
+```bash
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1-1.htm" | rg -oE '(src|href)="[^"]+\.mp3"' | head -20
+curl -fsSL "https://elc.polyu.edu.hk/sounds/pron/ipa/EEEE.mp3" -o /tmp/test_polyu.mp3 -w "%{http_code} %{size_download}\n"
+file /tmp/test_polyu.mp3
+```
+
+```
+rg: error parsing flag -E: grep config error: unknown encoding: (src|href)="[^"]+\.mp3"
+curl: (23) Failure writing output to destination, passed 14480 returned 0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1-1.htm" | grep -oE '[^"]+\.mp3' | sort -u</summary>
+
+```bash
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1-1.htm" | grep -oE '[^"]+\.mp3' | sort -u
+```
+
+```
+/pron/words/li_test1_1.mp3
+pron/ipa/AE.mp3
+pron/ipa/CAP_I.mp3
+pron/ipa/EEEE.mp3
+pron/words/BEE.mp3
+pron/words/CHLORINE.mp3
+pron/words/HAPPY.mp3
+pron/words/HYMN.mp3
+pron/words/MARINE.mp3
+pron/words/SEA.mp3
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: for f in \
+  https://elc.polyu.edu.hk/sounds/lesson1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson4.htm \
+  https://elc.polyu.edu.hk/sounds/lesson4-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson5.htm \
+  https://elc.polyu.edu.hk/sounds/lesson5-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-4.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-5.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-6.htm \
+  https://elc.polyu.edu.hk/sounds/lesson7.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson9.htm \
+  https://elc.polyu.edu.hk/sounds/lesson10.htm \
+; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$f" 2>/dev/null)
+  if [ "$code" = "200" ]; then echo "OK $f"; curl -fsSL -A "Mozilla/5.0" "$f" 2>/dev/null | grep -oE 'pron/ipa/[^"<>]+\.mp3' | sort -u; fi
+done | sort -u</summary>
+
+```bash
+for f in \
+  https://elc.polyu.edu.hk/sounds/lesson1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson1-3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson2-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson4.htm \
+  https://elc.polyu.edu.hk/sounds/lesson4-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson5.htm \
+  https://elc.polyu.edu.hk/sounds/lesson5-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-3.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-4.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-5.htm \
+  https://elc.polyu.edu.hk/sounds/lesson6-6.htm \
+  https://elc.polyu.edu.hk/sounds/lesson7.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8-1.htm \
+  https://elc.polyu.edu.hk/sounds/lesson8-2.htm \
+  https://elc.polyu.edu.hk/sounds/lesson9.htm \
+  https://elc.polyu.edu.hk/sounds/lesson10.htm \
+; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$f" 2>/dev/null)
+  if [ "$code" = "200" ]; then echo "OK $f"; curl -fsSL -A "Mozilla/5.0" "$f" 2>/dev/null | grep -oE 'pron/ipa/[^"<>]+\.mp3' | sort -u; fi
+done | sort -u
+```
+
+```
+OK https://elc.polyu.edu.hk/sounds/lesson1-1.htm
+OK https://elc.polyu.edu.hk/sounds/lesson1-2.htm
+OK https://elc.polyu.edu.hk/sounds/lesson1-3.htm
+OK https://elc.polyu.edu.hk/sounds/lesson1.htm
+pron/ipa/AE.mp3
+pron/ipa/CAP_I.mp3
+pron/ipa/EEEE.mp3
+pron/ipa/LONG_U.mp3
+pron/ipa/SCHWA.mp3
+pron/ipa/SHORT_U.mp3
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1.htm" | grep -oE 'href="[^"]+\.htm"' | sed 's/href="//;s/"$//' | sort -u
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/" 2>/dev/null | head -5 || true
+for u in \
+  lesson1.htm lesson1-1.htm lesson1-2.htm lesson1-3.htm \
+  lesson2.htm lesson2-1.htm lesson2-2.htm lesson2-3.htm lesson2-4.htm lesson2-5.htm lesson2-6.htm \
+  lesson3.htm lesson3-1.htm lesson3-2.htm lesson3-3.htm lesson3-4.htm \
+  lesson4.htm lesson4-1.htm lesson4-2.htm lesson4-3.htm lesson4-4.htm lesson4-5.htm \
+  lesson5.htm lesson5-1.htm lesson5-2.htm lesson5-3.htm \
+  lesson6.htm lesson6-1.htm \
+  lesson7.htm lesson7-1.htm \
+  lesson8.htm lesson8-1.htm lesson8-2.htm \
+  lesson9.htm lesson9-1.htm \
+  lesson10.htm lesson10-1.htm
+do
+  b=$(curl -s -o /dev/null -w "%{http_code}" "https://elc.polyu.edu.hk/sounds/$u" -A "Mozilla/5.0")
+  [ "$b" = "200" ] && curl -fsSL "https://elc.polyu.edu.hk/sounds/$u" -A "Mozilla/5.0" | grep -oE 'pron/ipa/[^"<> ]+\.mp3'
+done 2>/dev/null | sort -u</summary>
+
+```bash
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson1.htm" | grep -oE 'href="[^"]+\.htm"' | sed 's/href="//;s/"$//' | sort -u
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/" 2>/dev/null | head -5 || true
+for u in \
+  lesson1.htm lesson1-1.htm lesson1-2.htm lesson1-3.htm \
+  lesson2.htm lesson2-1.htm lesson2-2.htm lesson2-3.htm lesson2-4.htm lesson2-5.htm lesson2-6.htm \
+  lesson3.htm lesson3-1.htm lesson3-2.htm lesson3-3.htm lesson3-4.htm \
+  lesson4.htm lesson4-1.htm lesson4-2.htm lesson4-3.htm lesson4-4.htm lesson4-5.htm \
+  lesson5.htm lesson5-1.htm lesson5-2.htm lesson5-3.htm \
+  lesson6.htm lesson6-1.htm \
+  lesson7.htm lesson7-1.htm \
+  lesson8.htm lesson8-1.htm lesson8-2.htm \
+  lesson9.htm lesson9-1.htm \
+  lesson10.htm lesson10-1.htm
+do
+  b=$(curl -s -o /dev/null -w "%{http_code}" "https://elc.polyu.edu.hk/sounds/$u" -A "Mozilla/5.0")
+  [ "$b" = "200" ] && curl -fsSL "https://elc.polyu.edu.hk/sounds/$u" -A "Mozilla/5.0" | grep -oE 'pron/ipa/[^"<> ]+\.mp3'
+done 2>/dev/null | sort -u
+```
+
+```
+index.htm
+lesson1-1.htm
+lesson1-2.htm
+lesson1-3.htm
+lesson1.htm
+lesson10-1.htm
+lesson10-2.htm
+lesson10-3.htm
+lesson10.htm
+lesson2-1.htm
+lesson2-2.htm
+lesson2-3.htm
+lesson2-4.htm
+lesson2-5.htm
+lesson2.htm
+lesson3-1.htm
+lesson3-2.htm
+lesson3-3.htm
+lesson3-4.htm
+lesson3-5.htm
+lesson3.htm
+lesson4-1.htm
+lesson4-2.htm
+lesson4-3.htm
+lesson4-4.htm
+lesson4.htm
+lesson5-1.htm
+lesson5-2.htm
+lesson5-3.htm
+lesson5-4.htm
+lesson5-5.htm
+lesson5.htm
+lesson6-1.htm
+lesson6-2.htm
+lesson6.htm
+lesson7-1.htm
+lesson7-2.htm
+lesson7-3.htm
+lesson7.htm
+lesson8-1.htm
+lesson8-2.htm
+lesson8-3.htm
+lesson8.htm
+lesson9-1.htm
+lesson9.htm
+&lt;!DOCTYPE html&gt;
+&lt;html lang="en-US"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;meta name="viewport" content="width=device-width, initial-scale=1.0" /&gt;
+pron/ipa/AE.mp3
+pron/ipa/CAP_I.mp3
+pron/ipa/EEEE.mp3
+pron/ipa/LONG_U.mp3
+pron/ipa/SCHWA.mp3
+pron/ipa/SHORT_U.mp3
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson2-1.htm" | tr '"' '\n' | grep -E 'ipa|mp3' | head -40</summary>
+
+```bash
+curl -fsSL -A "Mozilla/5.0" "https://elc.polyu.edu.hk/sounds/lesson2-1.htm" | tr '"' '\n' | grep -E 'ipa|mp3' | head -40
+```
+
+```
+js/ipa.js
+pron/ipa/IR.mp3
+pron/ipa/UP.mp3
+pron/ipa/SCHWA.mp3
+pron/ipa/IR.mp3
+pron/ipa/SCHWA.mp3
+pron/ipa/EEEE.mp3
+pron/ipa/CAP_I.mp3
+pron/ipa/SCHWA.mp3
+pron/words/unstressed.mp3
+pron/words/the.mp3
+pron/ipa/E.mp3
+pron/words/ten.mp3
+pron/ipa/EEEE.mp3
+pron/ipa/EEEE.mp3
+/pron/words/li_test1_1.mp3
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: set +e
+urls=$(curl -fsSL "https://elc.polyu.edu.hk/sounds/lesson1.htm" -A "Mozilla/5.0" | tr '"' '\n' | grep -E '\.htm$' | sort -u)
+# also use known list
+base="https://elc.polyu.edu.hk/sounds"
+all_mps=""
+for u in $urls; do
+  full="$base/${u#https://*}"
+  [ "${u#http}" != "$u" ] && full="$u"
+  [[ "$u" = http* ]] && full="$u"
+  [[ "$u" != *:* ]] && full="$base/$u"
+  code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$full")
+  [ "$code" = "200" ] || continue
+  mp=$(curl -fsSL -A "Mozilla/5.0" "$full" 2>/dev/null | tr '"' '\n' | grep -oE 'pron/ipa/[^"<> ]+\.mp3')
+  all_mps+="$mp"$'\n'
+done
+echo "$all_mps" | sort -u
+</summary>
+
+```bash
+set +e
+urls=$(curl -fsSL "https://elc.polyu.edu.hk/sounds/lesson1.htm" -A "Mozilla/5.0" | tr '"' '\n' | grep -E '\.htm$' | sort -u)
+# also use known list
+base="https://elc.polyu.edu.hk/sounds"
+all_mps=""
+for u in $urls; do
+  full="$base/${u#https://*}"
+  [ "${u#http}" != "$u" ] && full="$u"
+  [[ "$u" = http* ]] && full="$u"
+  [[ "$u" != *:* ]] && full="$base/$u"
+  code=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$full")
+  [ "$code" = "200" ] || continue
+  mp=$(curl -fsSL -A "Mozilla/5.0" "$full" 2>/dev/null | tr '"' '\n' | grep -oE 'pron/ipa/[^"<> ]+\.mp3')
+  all_mps+="$mp"$'\n'
+done
+echo "$all_mps" | sort -u
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /tmp && curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" -o polyu_index.htm && \
+grep -oE 'lesson[0-9-]+\.htm' polyu_index.htm | sort -u | while read f; do \
+  u="https://elc.polyu.edu.hk/sounds/$f"
+  c=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u")
+  [ "$c" = "200" ] && echo "$u"
+done > /tmp/polyu_htm_list.txt
+wc -l /tmp/polyu_htm_list.txt
+while read u; do curl -fsSL "$u" -A "Mozilla/5.0" 2>/dev/null; done < /tmp/polyu_htm_list.txt | tr '"' '\n' | grep -oE 'pron/ipa/[^"<> ]+\.mp3' | sort -u</summary>
+
+```bash
+cd /tmp && curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" -o polyu_index.htm && \
+grep -oE 'lesson[0-9-]+\.htm' polyu_index.htm | sort -u | while read f; do \
+  u="https://elc.polyu.edu.hk/sounds/$f"
+  c=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u")
+  [ "$c" = "200" ] && echo "$u"
+done > /tmp/polyu_htm_list.txt
+wc -l /tmp/polyu_htm_list.txt
+while read u; do curl -fsSL "$u" -A "Mozilla/5.0" 2>/dev/null; done < /tmp/polyu_htm_list.txt | tr '"' '\n' | grep -oE 'pron/ipa/[^"<> ]+\.mp3' | sort -u
+```
+
+```
+]633;P;Cwd=/Users/leocaseiro/Sites/ipa-phonemes-recorder]633;P;HasRichCommandDetection=True]633;A$ ]633;B]633;E;cd /tmp &amp;&amp; curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" -o polyu_index.htm &amp;&amp; \\\x0agrep -oE 'lesson[0-9-]+\\.htm' polyu_index.htm | sort -u | while read f\x3b do \\\x0a  u="https://elc.polyu.edu.hk/sounds/$f"\x0a  c=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u")\x0a  [ "$c" = "200" ] &amp;&amp; echo "$u"\x0adone &gt; /tmp/polyu_htm_list.txt\x0awc -l /tmp/polyu_htm_list.txt\x0awhile read u\x3b do curl -fsSL "$u" -A "Mozilla/5.0" 2&gt;/dev/null\x3b done &lt; /tmp/polyu_htm_list.txt | tr '"' '\\n' | grep -oE 'pron/ipa/[^"&lt;&gt; ]+\\.mp3' | sort -ucd /tmp &amp;&amp; curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" -o polyu_index.htm &amp;&amp; \
+grep -oE 'lesson[0-9-]+\.htm' polyu_index.htm | sort -u | while read f; do \
+  u="https://elc.polyu.edu.hk/sounds/$f"
+  c=$(curl -s -o /dev/null -w "%{http_code}" -A "Mozilla/5.0" "$u")
+  [ "$c" = "200" ] &amp;&amp; echo "$u"
+done &gt; /tmp/polyu_htm_list.txt
+wc -l /tmp/polyu_htm_list.txt
+while read u; do curl -fsSL "$u" -A "Mozilla/5.0" 2&gt;/dev/null; done &lt; /tmp/polyu_htm_list.txt | tr '"' '\n' | grep -oE 'pron/ipa/[^"&lt;&gt; ]+\.mp3' | sort -u
+]633;C      44 /tmp/polyu_htm_list.txt
+pron/ipa/AE.mp3
+pron/ipa/AI.mp3
+pron/ipa/AIR.mp3
+pron/ipa/AU.mp3
+pron/ipa/B.mp3
+pron/ipa/BACK_A.mp3
+pron/ipa/CAP_I.mp3
+pron/ipa/CH.mp3
+pron/ipa/D.mp3
+pron/ipa/DARK_L3.mp3
+pron/ipa/DZ.mp3
+pron/ipa/E.mp3
+pron/ipa/EAR.mp3
+pron/ipa/EEEE.mp3
+pron/ipa/EI.mp3
+pron/ipa/F.mp3
+pron/ipa/F_R.mp3
+pron/ipa/G.mp3
+pron/ipa/H.mp3
+pron/ipa/IR.mp3
+pron/ipa/J.mp3
+pron/ipa/K.mp3
+pron/ipa/L.mp3
+pron/ipa/LONG_A.mp3
+pron/ipa/LONG_U.mp3
+pron/ipa/M.mp3
+pron/ipa/N.mp3
+pron/ipa/NG.mp3
+pron/ipa/OH.mp3
+pron/ipa/OI.mp3
+pron/ipa/OO-ER.mp3
+pron/ipa/OR.mp3
+pron/ipa/P.mp3
+pron/ipa/R.mp3
+pron/ipa/S.mp3
+pron/ipa/SCHWA.mp3
+pron/ipa/SH.mp3
+pron/ipa/SHORT_U.mp3
+pron/ipa/T.mp3
+pron/ipa/TH@.mp3
+pron/ipa/THIN.mp3
+pron/ipa/TH_UV.mp3
+pron/ipa/TH_V.mp3
+pron/ipa/UP.mp3
+pron/ipa/V.mp3
+pron/ipa/W.mp3
+pron/ipa/Z.mp3
+pron/ipa/ZH.mp3
+pron/ipa/b.mp3
+pron/ipa/dz.mp3
+pron/ipa/j.mp3
+pron/ipa/m.mp3
+pron/ipa/p.mp3
+]633;D;0
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/.cursor/projects/Users-leocaseiro-Sites-ipa-phonemes-recorder/terminals/897727.txt</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="await">
+<details>
+<summary>Tool use: **await**</summary>
+
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="await"><details>
+<summary>Tool use: **await**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/.cursor/projects/Users-leocaseiro-Sites-ipa-phonemes-recorder/terminals/897727.txt</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+We have approximately 56 unique files.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL "https://elc.polyu.edu.hk/sounds/js/ipa.js" -A "Mozilla/5.0" | head -200</summary>
+
+```bash
+curl -fsSL "https://elc.polyu.edu.hk/sounds/js/ipa.js" -A "Mozilla/5.0" | head -200
+```
+
+```
+// JavaScript Document
+
+var EEEE = ['i&amp;#x02D0;'];
+var CAP_I = ['&amp;#x026A;'];
+var SHORT_U = ['&amp;#x028A;'];
+var LONG_U = ['u&amp;#x02D0;'];
+var SCHWA = ['&amp;#x0259;'];
+var IR = ['&amp;#x025C;&amp;#x02D0;'];
+var OR = ['&amp;#x0254;&amp;#x02D0;'];
+var AE = ['&amp;#x00E6;'];
+var UP = ['&amp;#x028C;'];
+var LONG_A = ['&amp;#x0251;&amp;#x02d0;'];
+var BACK_A = ['&amp;#x0252;'];
+var EAR = ['&amp;#x026A;&amp;#x0259;'];
+var EI = ['e&amp;#x026A;'];
+var OO_ER = ['&amp;#x028A;&amp;#x0259;'];
+var OI = ['&amp;#x0254;&amp;#x026A;'];
+var OH = ['&amp;#x0259;&amp;#x028A;'];
+var AIR = ['e&amp;#x0259;'];
+var AI = ['a&amp;#x026A;'];
+var AU = ['a&amp;#x028A;'];
+var TH_UV = ['&amp;#x03B8;'];
+var TH_V = ['&amp;#x00F0;'];
+var SH = ['&amp;#x0283;'];
+var ZH = ['&amp;#x0292;'];
+var NG = ['&amp;#x014B;'];
+var CH = ['&amp;#x02A7;'];
+var DZ = ['&amp;#x02A4;'];
+var F_R = ['f&amp;#x0259;'];
+var OVEN = ['v'];
+var DARK_L3 = ['l'];
+var nonUnicode = 'EPBTDKGFVSZMNHLRJW';
+
+
+// slash - if true, add "/" before and after the sound
+function printSound(snd, cssName, slash) {
+	var val = snd;
+	if (nonUnicode.indexOf(snd) &lt; 0) {
+		val = eval(snd+'[0]');
+	} else {
+		val = val.toLowerCase();
+	}
+	if (cssName == undefined) cssName = "unicodetextred";
+	if (slash == undefined) slash = "";
+//	document.write("&lt;a href=\"say_"+snd+".asp\" onmouseover=\"showSpeaker(this,'ipa','"+snd+".WAV')\" onmouseout=\"hideSpeaker()\" &gt;&lt;span class=\""+cssName+"\" style=\"line-height:90%;\"&gt;"+slash+val+slash+"&lt;/span&gt;&lt;/a&gt;");
+	document.write("&lt;a href=\"say_"+snd+".aspx\"&gt;&lt;span class=\""+cssName+"\" onmouseover=\"showSpeaker(this,'ipa','"+snd+".WAV')\" onmouseout=\"hideSpeaker()\"&gt;"+slash+val+slash+"&lt;/span&gt;&lt;/a&gt;");
+}
+
+function printSoundWithSlash(snd, cssName) {
+	printSound(snd, cssName, '/');
+}
+
+function printIPAWord(word, cssName) {
+	var sndArray = word.split(',');
+	for (i=0; i&lt;sndArray.length; i++) {
+		printSound(sndArray[i], cssName);
+	}
+}
+
+function printWord(word, cssName) {
+	if (cssName == undefined) cssName = "redtext";
+	document.write("&lt;span class=\""+cssName+"\" onmouseover=\"showSpeaker(this,'words','"+word+".WAV')\" onmouseout=\"hideSpeaker()\"&gt;"+word+"&lt;/span&gt;");				
+}
+
+// when click on the word, an alert "Would you like more information on this subject?' will be shown
+function printWordWithInfo(word, page, cssName) {
+	if (cssName == undefined) cssName = "redtext";	
+	document.write("&lt;span class=\""+cssName+"\" onmouseover=\"setPageAndShowSpeaker(this,'words','"+word+".WAV','"+page+"')\" onmouseout=\"hideSpeaker()\"&gt;"+word+"&lt;/span&gt;");
+}
+
+// variable 'start' is where to start putting the underline tag, it begins with 0
+// variable 'end' is where to put the closing underline tag
+function printWordWithUnderline(word, start, end, cssName) {
+	if (cssName == undefined) cssName = "redtext";
+	var sWord = word.substr(0,start)+"&lt;u&gt;"+word.substr(start,end-start)+"&lt;/u&gt;"+word.substr(end);
+	document.write("&lt;span class=\""+cssName+"\" onmouseover=\"showSpeaker(this,'words','"+word+".WAV')\" onmouseout=\"hideSpeaker()\"&gt;"+sWord+"&lt;/span&gt;");				
+}
+		
+	
+																																										
+																																										
+																																										
+	
+
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Perfect! The JavaScript maps variable names to Unicode IPA characters. Our mapping includes: AIR = e  e_schwa, EAR =   i_schwa, EI = e  ey, E = dress /e/  E.mp3, EEEE = i  ee, IR =   er, OR =   or_caught, OH =   ow. From ipa.js: E = dress /e/ with href E.mp3. Let me map: e  E.mp3, ee  EEEE.mp3, ih  CAP_I. The mapping for e_near () is ambiguous since there's no direct match for  in the list. While **AIR** (e) is the closest diphthong available, using **E.mp3** or **IR** might be better alternatives. Since **AIR** shares the same file as **e_schwa**, it should not be used for **e_near**. A dedicated entry or alternative like **E.mp3** is recommended instead. The mapping for **e_schwa (e)** is correctly **AIR**, but **e_near ()** may not exist as a separate entry; British English sometimes merges them. In such cases, **E.mp3** or duplicating **AIR** with a note is suggested. PolyU uses **E** for /e/ and **AIR** for /e/, so consider using **E** for  if it's a single file.
+
+For **i_schwa ()**, the correct mapping is **EAR**. As for **ju (ju)**, its not directly mapped; **J** and **W** may represent /d/ and /w/ sounds respectively. The glide /j/ could be a separate file, and **j** in `nonUnicode` might denote /d/. 
+
+- **e_schwa (e)** = AIR  
+- **e_near ()** = possibly - **ju** should map to **j.mp3** for /j/ sound, not **W**, since **W** represents /w/.
+- For **e_near** (), which is not in the list, use **E.mp3** as a weak approximation or check for epsilon in words only.
+- **F_R** = f, not related to our **er** sound.
+- **er** () = **IR.mp3**, matching **IR** in ipa.js with open e + length. - **or_caught ()** = **OR.mp3** per ipa.js  
+- **OO_ER** =   **e_near** maps to , not ; use **AIR** or **E** for  if no direct match  
+- **th_vl**: THIN = , TH_V = , TH@ may be ; **THIN.mp3** for , **TH_V** for , **TH_UV** for   
+- Duplicate names: **THIN**, **TH_UV**, and **TH@** refer to different th sounds; resolve naming conflicts  
+- Create `scripts/fetch_polyu_references.py` to download all 56 unique files from the list  
+- Generate a mapping script to convert variable names to IPA files  
+- Add fallbacks for missing entries like **e_near** using **AIR** or **E**  
+- The JSON structure for phoneme references now separates vocabulary and PolyU data into distinct files: `phoneme_reference_files.json` and `phoneme_reference_files_polyu.json`.  
+
+Server endpoints support fetching references by source:
+- `GET /api/banks/{bank}/phonemes/{id}/reference?source=polyu` for PolyU data
+- `GET /api/banks/{bank}/phonemes/{id}/reference` defaults to vocabulary data
+
+Default behavior prioritizes PolyU references when available. Since PolyU sounds more UK-style, default to PolyU when available. User requested multiple references, so:
+
+- List endpoint `GET .../reference/sources` returns available sources like Vocabulary.com and PolyU ELC (UK-AUS style)
+- Embed sources in `GET /api/banks/:id` for easier access
+- Simpler query param approach: `?source=polyu|vocabulary` with defaulting logic
+- Better approach: use `reference_sources` in server config as an ordered list for clarity</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "glob": ".gitignore",
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder",
+  "pattern": "references"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder",
+  "pattern": "references",
+  "topFiles": [
+    {
+      "matchCount": 1,
+      "uri": "./.gitignore"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 1
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+references/ is fully gitignored, so PolyU will be placed inside itgood.</details></think>
+
+_**Agent (composer-2)**_
+
+Implementing the PolyU download script, a phoneme → filename map, server support with `?source=`, and a UI source selector.
+
+
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/index.html</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+- `from urllib.`</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/references.py</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+I'll implement a comprehensive update.</details></think>
+
+_**Agent (composer-2)**_
+
+Creating the seed map, download script, server/API/UI updates, and running the download.
+
+
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/seeds/phoneme_polyu_files.json</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/scripts/fetch_polyu_references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+The fetch script had a logic error where `if "need" in dir()` was used incorrectly. This has been fixed by replacing it with a proper flag-based approach for better reliability and clarity.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/scripts/fetch_polyu_references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/scripts/fetch_polyu_references.py</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/scripts/fetch_polyu_references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Now rewrite `serve_reference` in references.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Update app.py to import REFERENCE_SOURCES and load_phoneme_polyu_files.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+main.js - add:
+- refSourceKey in localStorage `ref_source` with default auto-value</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/api.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+When the source is "auto", the getReference function should not include a query parameter or the "?" character.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/styles.css</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search">
+<details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+
+Parameters:
+
+```json
+{
+  "caseInsensitive": false,
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/styles.css",
+  "pattern": "phoneme-detail"
+}
+```
+Additional data:
+
+```json
+{
+  "isPruned": true,
+  "outputMode": "content",
+  "path": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/styles.css",
+  "pattern": "phoneme-detail",
+  "topFiles": [
+    {
+      "matchCount": 6,
+      "uri": "ui/styles.css"
+    }
+  ],
+  "totalFiles": 1,
+  "totalMatches": 6
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="ripgrep_raw_search"><details>
+<summary>Tool use: **ripgrep_raw_search**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/styles.css</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+I'll add a wrapper for ref controls: flex row with select + button. The header layout will be: ipa | example | [ref source select] [play button], with the reference controls wrapped in a div that uses flexbox for alignment and spacing.
+
+- Reference controls use flexbox with margin-left auto
+- Select and button have a gap of 10px between them
+- Label and select are aligned vertically with 6px gap
+- Controls wrap when needed due to flex-wrap property</details></think>
+
+_**Agent (composer-2)**_
+
+The string to replace was not found in the file.
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Revert the renderHealth change as it was incorrect.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/styles.css</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Write tests for the new API in test_references.py. Run the fetch_polyu script in the project and fix the `discover_urls` function, which may not capture all lessons since the index page might not list everything. The original crawl found 44 lessons from lesson1 links, but the script only searches the index page for lesson links, potentially missing nested pages. Verify that the index contains all lessons or implement a recursive or broader crawl to ensure full discovery.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" | tr '"' '\n' | grep -E 'lesson[0-9-]+\.htm$' | sort -u | wc -l</summary>
+
+```bash
+curl -fsSL "https://elc.polyu.edu.hk/sounds/index.htm" -A "Mozilla/5.0" | tr '"' '\n' | grep -E 'lesson[0-9-]+\.htm$' | sort -u | wc -l
+```
+
+```
+      44
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+44 links in index - discover_urls in script uses the same - good.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2">
+<details><summary>Tool use: **read_file_v2** • Read file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/tests/test_references.py</summary>
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="read" data-tool-name="read_file_v2"><details>
+<summary>Tool use: **read_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Update all serve_reference calls with the new parameters.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/tests/test_references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+- Run tests and fetch the script.
+- Fix the API.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -m unittest tests.test_takes tests.test_references -v</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -m unittest tests.test_takes tests.test_references -v
+```
+
+```
+test_deleted_gap_does_not_rewind_counter (tests.test_takes.MonotonicTakeIdTest.test_deleted_gap_does_not_rewind_counter)
+002 was created then deleted; only 001 remains on disk and in ... ok
+test_highest_take_deleted_does_not_rewind_counter (tests.test_takes.MonotonicTakeIdTest.test_highest_take_deleted_does_not_rewind_counter)
+The bug the user hit: 001..004 exist, delete 004, then ... ok
+test_picks_max_plus_one_from_disk (tests.test_takes.MonotonicTakeIdTest.test_picks_max_plus_one_from_disk) ... ok
+test_starts_at_001_when_empty (tests.test_takes.MonotonicTakeIdTest.test_starts_at_001_when_empty) ... ok
+test_loads_phoneme_polyu_files (tests.test_references.LoadSeedsTest.test_loads_phoneme_polyu_files) ... ok
+test_loads_phoneme_reference_files (tests.test_references.LoadSeedsTest.test_loads_phoneme_reference_files) ... ok
+test_auto_prefers_polyu (tests.test_references.ServeReferenceFileTest.test_auto_prefers_polyu) ... ok
+test_polyu_only_fails_if_missing (tests.test_references.ServeReferenceFileTest.test_polyu_only_fails_if_missing) ... ok
+test_prefers_ogg_wikimedia_when_no_map_vocabulary (tests.test_references.ServeReferenceFileTest.test_prefers_ogg_wikimedia_when_no_map_vocabulary) ... ok
+test_reference_missing_auto (tests.test_references.ServeReferenceFileTest.test_reference_missing_auto) ... ok
+test_vocabulary_only_skips_polyu (tests.test_references.ServeReferenceFileTest.test_vocabulary_only_skips_polyu) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.004s
+
+OK
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 scripts/fetch_polyu_references.py</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 scripts/fetch_polyu_references.py
+```
+
+```
+warning: phoneme_polyu_files.json still missing on disk:
+  j.mp3
+ok     AE.mp3
+ok     AI.mp3
+ok     AIR.mp3
+ok     AU.mp3
+ok     B.mp3
+ok     BACK_A.mp3
+ok     CAP_I.mp3
+ok     CH.mp3
+ok     D.mp3
+ok     DARK_L3.mp3
+ok     DZ.mp3
+ok     E.mp3
+ok     EAR.mp3
+ok     EEEE.mp3
+ok     EI.mp3
+ok     F.mp3
+ok     F_R.mp3
+ok     G.mp3
+ok     H.mp3
+ok     IR.mp3
+ok     J.mp3
+ok     K.mp3
+ok     L.mp3
+ok     LONG_A.mp3
+ok     LONG_U.mp3
+ok     M.mp3
+ok     N.mp3
+ok     NG.mp3
+ok     OH.mp3
+ok     OI.mp3
+ok     OO-ER.mp3
+ok     OR.mp3
+ok     P.mp3
+ok     R.mp3
+ok     S.mp3
+ok     SCHWA.mp3
+ok     SH.mp3
+ok     SHORT_U.mp3
+ok     T.mp3
+ok     TH@.mp3
+ok     THIN.mp3
+ok     TH_UV.mp3
+ok     TH_V.mp3
+ok     UP.mp3
+ok     V.mp3
+ok     W.mp3
+ok     Z.mp3
+ok     ZH.mp3
+skip   b.mp3
+skip   dz.mp3
+skip   j.mp3
+skip   m.mp3
+skip   p.mp3
+
+downloaded 48, skipped 5, failed 0, total discovered 53
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+The seed maps `j` to `j.mp3`, but the site might use `J`.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: curl -sI "https://elc.polyu.edu.hk/sounds/pron/ipa/j.mp3" -A "Mozilla/5.0" | head -2
+curl -sI "https://elc.polyu.edu.hk/sounds/pron/ipa/J.mp3" -A "Mozilla/5.0" | head -2
+ls /Users/leocaseiro/Sites/ipa-phonemes-recorder/references/polyu/ | sort</summary>
+
+```bash
+curl -sI "https://elc.polyu.edu.hk/sounds/pron/ipa/j.mp3" -A "Mozilla/5.0" | head -2
+curl -sI "https://elc.polyu.edu.hk/sounds/pron/ipa/J.mp3" -A "Mozilla/5.0" | head -2
+ls /Users/leocaseiro/Sites/ipa-phonemes-recorder/references/polyu/ | sort
+```
+
+```
+HTTP/1.1 200 OK
+Server: nginx
+HTTP/1.1 200 OK
+Server: nginx
+AE.mp3
+AI.mp3
+AIR.mp3
+AU.mp3
+B.mp3
+BACK_A.mp3
+CAP_I.mp3
+CH.mp3
+D.mp3
+DARK_L3.mp3
+DZ.mp3
+E.mp3
+EAR.mp3
+EEEE.mp3
+EI.mp3
+F.mp3
+F_R.mp3
+G.mp3
+H.mp3
+IR.mp3
+J.mp3
+K.mp3
+L.mp3
+LONG_A.mp3
+LONG_U.mp3
+M.mp3
+N.mp3
+NG.mp3
+OH.mp3
+OI.mp3
+OO-ER.mp3
+OR.mp3
+P.mp3
+R.mp3
+S.mp3
+SCHWA.mp3
+SH.mp3
+SHORT_U.mp3
+T.mp3
+TH@.mp3
+THIN.mp3
+TH_UV.mp3
+TH_V.mp3
+UP.mp3
+V.mp3
+W.mp3
+Z.mp3
+ZH.mp3
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Both j.mp3 and J exist; the fetch skipped b,p,m,dz,j because files already exist, but a warning was shown for j.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/server/seeds/phoneme_polyu_files.json</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Note in _comment: j uses J (site convention)</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2">
+
+<details><summary>Tool use: **edit_file_v2** • Edit file: /Users/leocaseiro/Sites/ipa-phonemes-recorder/scripts/fetch_polyu_references.py</summary>
+
+</details>
+
+</tool-use>
+
+<tool-use data-tool-type="write" data-tool-name="edit_file_v2"><details>
+<summary>Tool use: **edit_file_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -c "
+import json
+from pathlib import Path
+j = json.loads(Path('server/seeds/phoneme_polyu_files.json').read_text())
+need = {v for k,v in j.items() if not k.startswith('_')}
+p = Path('references/polyu')
+for n in sorted(need):
+    f = p/n
+    print(n, 'OK' if f.is_file() else 'MISSING')
+"</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && python3 -c "
+import json
+from pathlib import Path
+j = json.loads(Path('server/seeds/phoneme_polyu_files.json').read_text())
+need = {v for k,v in j.items() if not k.startswith('_')}
+p = Path('references/polyu')
+for n in sorted(need):
+    f = p/n
+    print(n, 'OK' if f.is_file() else 'MISSING')
+"
+```
+
+```
+AE.mp3 OK
+AI.mp3 OK
+AIR.mp3 OK
+AU.mp3 OK
+B.mp3 OK
+BACK_A.mp3 OK
+CAP_I.mp3 OK
+CH.mp3 OK
+D.mp3 OK
+DZ.mp3 OK
+E.mp3 OK
+EAR.mp3 OK
+EEEE.mp3 OK
+EI.mp3 OK
+F.mp3 OK
+G.mp3 OK
+H.mp3 OK
+IR.mp3 OK
+J.mp3 OK
+K.mp3 OK
+L.mp3 OK
+LONG_A.mp3 OK
+LONG_U.mp3 OK
+M.mp3 OK
+N.mp3 OK
+NG.mp3 OK
+OH.mp3 OK
+OI.mp3 OK
+OR.mp3 OK
+P.mp3 OK
+R.mp3 OK
+S.mp3 OK
+SH.mp3 OK
+SHORT_U.mp3 OK
+T.mp3 OK
+THIN.mp3 OK
+TH_V.mp3 OK
+UP.mp3 OK
+V.mp3 OK
+W.mp3 OK
+Z.mp3 OK
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints">
+<details>
+<summary>Tool use: **read_lints**</summary>
+
+
+Parameters:
+
+```json
+{
+  "paths": [
+    "/Users/leocaseiro/Sites/ipa-phonemes-recorder/server/references.py",
+    "/Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py",
+    "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js",
+    "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/api.js"
+  ]
+}
+```
+Result:
+
+```json
+{
+  "linterErrorsByFile": [
+    {
+      "relativeWorkspacePath": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/server/references.py"
+    },
+    {
+      "relativeWorkspacePath": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/server/app.py"
+    },
+    {
+      "relativeWorkspacePath": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/main.js"
+    },
+    {
+      "relativeWorkspacePath": "/Users/leocaseiro/Sites/ipa-phonemes-recorder/ui/api.js"
+    }
+  ]
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+<tool-use data-tool-type="unknown" data-tool-name="read_lints"><details>
+<summary>Tool use: **read_lints**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Fix API getReference when source is "auto" - options.</details></think>
+
+_**Agent (composer-2)**_
+
+Here’s what was added and how to use it.
+
+### 1. **`scripts/fetch_polyu_references.py`**
+- Walks the [PolyU ELC `index.htm`](https://elc.polyu.edu.hk/sounds/index.htm) (44 lesson pages), finds every `pron/ipa/*.mp3` link, downloads into **`references/polyu/`** (idempotent: skips non‑empty files).
+- Finishes with a second pass: any basename listed in `server/seeds/phoneme_polyu_files.json` that still isn’t on disk is requested from `https://elc.polyu.edu.hk/sounds/pron/ipa/<name>`.
+
+(That material is for teaching/learning; cache it only in ways you’re happy with for their [terms of use](https://www.vocabulary.com/)/site policy. We don’t add it to git—`references/` is already ignored.)
+
+### 2. **`server/seeds/phoneme_polyu_files.json`**
+- Maps your **`phoneme_id`** values to their filenames (naming comes from e.g. [`js/ipa.js`](https://elc.polyu.edu.hk/sounds/js/ipa.js), e.g. `AIR` = eə, `EI` = eɪ, `LONG_A` = ɑː, `IR` = ɜː, **etc.**).  
+- **`j`** (Palatal approximant) uses **`J.mp3`**, which is what their CDN exposes for that asset.
+
+### 3. **Server**
+- New **`GET /api/reference-sources`** — `{ "sources": [ { "id", "label" }, ... ] }`.
+- **`GET /api/banks/…/phonemes/…/reference?source=`** with  
+  **`auto`** (default) → PolyU if `references/polyu/<file>.mp3` exists, else Vocabulary;  
+  **`polyu`** or **`vocabulary`** only.
+
+### 4. **UI**
+- A **Reference** `<select>` (Auto / PolyU / Vocabulary) next to the play control; choice is stored in **`localStorage`** as `reference_source`.
+
+### 5. **Tests**
+- Updated for the new `serve_reference(…, phoneme_polyu_files=, source=)`.
+
+I ran the fetch once here; every entry in the PolyU map is present under **`references/polyu/`** on this machine. If you add mappings later, re-run:
+
+`python3 scripts/fetch_polyu_references.py`
+
+**Example** you mentioned — long **/iː/** as in the [Lesson 1 “How to say it /iː/ & /ɪ/”](https://elc.polyu.edu.hk/sounds/lesson1.htm) material is the clip saved as `EEEE.mp3` (as in the variable name in their script), and is mapped to your **`ee`** id in `phoneme_polyu_files.json`.
+
+---
+
+_**User**_
+
+commit
+
+---
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+The user intends to commit the changes.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git status</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git status
+```
+
+```
+On branch feat/reference-audio
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-23_03-15-02Z-file-download-to-references-directory.md
+	modified:   .specstory/statistics.json
+	modified:   server/app.py
+	modified:   server/references.py
+	modified:   tests/test_references.py
+	modified:   ui/api.js
+	modified:   ui/main.js
+	modified:   ui/styles.css
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	scripts/fetch_polyu_references.py
+	server/seeds/phoneme_polyu_files.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git status -u</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git status -u
+```
+
+```
+On branch feat/reference-audio
+Changes not staged for commit:
+  (use "git add &lt;file&gt;..." to update what will be committed)
+  (use "git restore &lt;file&gt;..." to discard changes in working directory)
+	modified:   .specstory/history/2026-04-23_03-15-02Z-file-download-to-references-directory.md
+	modified:   .specstory/statistics.json
+	modified:   server/app.py
+	modified:   server/references.py
+	modified:   tests/test_references.py
+	modified:   ui/api.js
+	modified:   ui/main.js
+	modified:   ui/styles.css
+
+Untracked files:
+  (use "git add &lt;file&gt;..." to include in what will be committed)
+	scripts/fetch_polyu_references.py
+	server/seeds/phoneme_polyu_files.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<think><details><summary>Thought Process</summary>
+Some files from our session may already be committed or the branch might only contain partial changes.</details></think>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git diff --stat && git log -1 --oneline</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git diff --stat && git log -1 --oneline
+```
+
+```
+ ...15-02Z-file-download-to-references-directory.md | 253 ++++++++++++++++++++-
+ .specstory/statistics.json                         |   8 +-
+ server/app.py                                      |  24 +-
+ server/references.py                               | 164 ++++++++++---
+ tests/test_references.py                           |  84 +++++--
+ ui/api.js                                          |  13 +-
+ ui/main.js                                         |  48 +++-
+ ui/styles.css                                      |  40 +++-
+ 8 files changed, 558 insertions(+), 76 deletions(-)
+7a783f5 WIP
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2">
+<details><summary>Tool use: **run_terminal_command_v2** • Run command: cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git add \
+  server/app.py \
+  server/references.py \
+  server/seeds/phoneme_polyu_files.json \
+  scripts/fetch_polyu_references.py \
+  tests/test_references.py \
+  ui/api.js \
+  ui/main.js \
+  ui/styles.css \
+  && git commit --trailer "Made-with: Cursor" -m "feat: PolyU ELC reference audio and multi-source playback
+
+- Add phoneme map and fetch script for PolyU (elc.polyu.edu.hk) clips under
+  references/polyu/
+- Add GET /api/reference-sources and ?source=auto|polyu|vocabulary on the
+  reference URL; auto prefers PolyU when present, else Vocabulary.com
+- UI: reference source dropdown; health banner no longer requires espeak
+- Update reference resolution tests
+
+refs remain gitignored; run: python3 scripts/fetch_polyu_references.py"</summary>
+
+```bash
+cd /Users/leocaseiro/Sites/ipa-phonemes-recorder && git add \
+  server/app.py \
+  server/references.py \
+  server/seeds/phoneme_polyu_files.json \
+  scripts/fetch_polyu_references.py \
+  tests/test_references.py \
+  ui/api.js \
+  ui/main.js \
+  ui/styles.css \
+  && git commit --trailer "Made-with: Cursor" -m "feat: PolyU ELC reference audio and multi-source playback
+
+- Add phoneme map and fetch script for PolyU (elc.polyu.edu.hk) clips under
+  references/polyu/
+- Add GET /api/reference-sources and ?source=auto|polyu|vocabulary on the
+  reference URL; auto prefers PolyU when present, else Vocabulary.com
+- UI: reference source dropdown; health banner no longer requires espeak
+- Update reference resolution tests
+
+refs remain gitignored; run: python3 scripts/fetch_polyu_references.py"
+```
+
+```
+[feat/reference-audio c30f3cf] feat: PolyU ELC reference audio and multi-source playback
+ 8 files changed, 472 insertions(+), 71 deletions(-)
+ create mode 100644 scripts/fetch_polyu_references.py
+ create mode 100644 server/seeds/phoneme_polyu_files.json
+
+```
+</details>
+</tool-use>
+
+<tool-use data-tool-type="shell" data-tool-name="run_terminal_command_v2"><details>
+<summary>Tool use: **run_terminal_command_v2**</summary>
+
+</details></tool-use>
+
+_**Agent (composer-2)**_
+
+Created commit **`c30f3cf`** on `feat/reference-audio` with message:
+
+**feat: PolyU ELC reference audio and multi-source playback**
+
+Included: `server/app.py`, `server/references.py`, `server/seeds/phoneme_polyu_files.json`, `scripts/fetch_polyu_references.py`, `tests/test_references.py`, `ui/api.js`, `ui/main.js`, `ui/styles.css`.
+
+Left out **`.specstory/`** (tool history). Say if you want that committed too or amended.

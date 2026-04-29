@@ -81,8 +81,16 @@ def _validate_phonemes(phonemes: Any) -> list[str]:
         else:
             seen_ipa.add(ipa)
 
-        if "example" in p and not isinstance(p["example"], str):
-            errors.append(f"phonemes[{i}].example must be a string")
+        if "example" in p:
+            ex = p["example"]
+            if isinstance(ex, str):
+                pass
+            elif isinstance(ex, list) and all(isinstance(e, str) for e in ex):
+                pass
+            else:
+                errors.append(
+                    f"phonemes[{i}].example must be a string or list of strings"
+                )
         if "loopable" in p and not isinstance(p["loopable"], bool):
             errors.append(f"phonemes[{i}].loopable must be a boolean")
         if "category" in p and not isinstance(p["category"], str):

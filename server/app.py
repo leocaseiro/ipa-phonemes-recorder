@@ -52,6 +52,7 @@ from server.takes import (
     delete_take,
     get_take_wav_path,
     save_take,
+    trim_take,
 )
 
 VERSION = "0.1.0"
@@ -77,6 +78,7 @@ MAX_STATE_BYTES = 10 * 1024 * 1024
 
 TAKE_POST_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes$")
 TAKE_FILE_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)$")
+TAKE_TRIM_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/takes/([^/]+)/trim$")
 REFERENCE_GET_RE = re.compile(r"^/api/banks/([^/]+)/phonemes/([^/]+)/reference$")
 STATE_PUT_RE = re.compile(r"^/api/banks/([^/]+)/state$")
 EXPORT_POST_RE = re.compile(r"^/api/banks/([^/]+)/export$")
@@ -193,6 +195,9 @@ class AppRequestHandler(BaseHTTPRequestHandler):
         try:
             if path == "/api/banks":
                 self._create_bank()
+            elif (match := TAKE_TRIM_RE.match(path)):
+                bank_id, phoneme_id, take_id = match.groups()
+                self._trim_take(bank_id, phoneme_id, take_id)
             elif (match := TAKE_POST_RE.match(path)):
                 bank_id, phoneme_id = match.groups()
                 self._create_take(bank_id, phoneme_id)
@@ -318,6 +323,104 @@ class AppRequestHandler(BaseHTTPRequestHandler):
             return
 
         self._send_json(HTTPStatus.CREATED, asdict(meta))
+
+    def _trim_take(self, bank_id: str, phoneme_id: str, source_take_id: str) -> None:
+        try:
+            read_bank(self.config.repo_root, bank_id)
+        except BankNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {"error": "not_found", "message": f"bank {bank_id!r} not found"},
+            )
+            return
+        except BankInvalid as exc:
+            self._send_json(
+                HTTPStatus.UNPROCESSABLE_ENTITY,
+                {"error": "bank_invalid", "errors": exc.errors},
+            )
+            return
+
+        if self.config.ffmpeg is None:
+            self._send_json(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "error": "ffmpeg_unavailable",
+                    "message": "ffmpeg not found on PATH; install via brew install ffmpeg",
+                },
+            )
+            return
+
+        length_header = self.headers.get("Content-Length")
+        try:
+            length = int(length_header) if length_header else 0
+        except ValueError:
+            length = 0
+        if length <= 0 or length > MAX_STATE_BYTES:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "invalid_body", "message": "missing or oversize body"},
+            )
+            return
+
+        try:
+            payload = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError as exc:
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_json", "message": str(exc)},
+            )
+            return
+        if not isinstance(payload, dict):
+            self._send_json(
+                HTTPStatus.BAD_REQUEST,
+                {"error": "bad_request", "message": "body must be a JSON object"},
+            )
+            return
+
+        start_ms = payload.get("start_ms")
+        end_ms = payload.get("end_ms")
+
+        try:
+            meta = trim_take(
+                bank_path=self.config.repo_root / "banks" / bank_id,
+                phoneme_id=phoneme_id,
+                source_take_id=source_take_id,
+                start_ms=start_ms,
+                end_ms=end_ms,
+                ffmpeg=self.config.ffmpeg,
+            )
+        except TakeNotFound:
+            self._send_json(
+                HTTPStatus.NOT_FOUND,
+                {
+                    "error": "not_found",
+                    "message": f"take {phoneme_id}/{source_take_id} not found",
+                },
+            )
+            return
+        except TakeSaveFailed as exc:
+            status = (
+                HTTPStatus.BAD_REQUEST
+                if exc.code == "trim_invalid_range"
+                else HTTPStatus.INTERNAL_SERVER_ERROR
+            )
+            self._send_json(
+                status,
+                {"error": exc.code, "message": exc.message, "detail": exc.detail},
+            )
+            return
+
+        self._send_json(
+            HTTPStatus.CREATED,
+            {
+                "id": meta.take_id,
+                "duration_ms": meta.duration_ms,
+                "peak_db": meta.peak_db,
+                "rms_db": meta.rms_db,
+                "created_at": meta.created_at,
+                "source_take_id": source_take_id,
+            },
+        )
 
     def _export_bank(self, bank_id: str) -> None:
         try:

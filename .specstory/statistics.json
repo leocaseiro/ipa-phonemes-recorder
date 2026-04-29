@@ -1,22 +1,49 @@
 {
   "sessions": {
-    "6ab5cb0f-a313-4d69-834c-1d2b37737a84": {
-      "user_message_count": 14,
-      "agent_message_count": 508,
-      "start_timestamp": "2026-04-23T03:40:08.997Z",
-      "end_timestamp": "2026-04-23T10:28:49.456Z",
-      "markdown_size_bytes": 411318,
+    "23875497-644a-428f-9c77-bf32c5665661": {
+      "user_message_count": 12,
+      "agent_message_count": 75,
+      "start_timestamp": "2026-04-24T04:30:26.623Z",
+      "end_timestamp": "2026-04-24T06:18:02.631Z",
+      "markdown_size_bytes": 163357,
       "provider": "claude-code",
-      "last_updated": "2026-04-23T10:28:49Z"
+      "last_updated": "2026-04-24T09:05:02Z"
+    },
+    "6815977b-c1e4-484d-b6cd-1f724b93af72": {
+      "user_message_count": 8,
+      "agent_message_count": 191,
+      "start_timestamp": "2026-04-24T06:23:36.958Z",
+      "end_timestamp": "2026-04-24T09:45:35.238Z",
+      "markdown_size_bytes": 216967,
+      "provider": "claude-code",
+      "last_updated": "2026-04-24T09:45:35Z"
+    },
+    "6ab5cb0f-a313-4d69-834c-1d2b37737a84": {
+      "user_message_count": 26,
+      "agent_message_count": 758,
+      "start_timestamp": "2026-04-23T03:40:08.997Z",
+      "end_timestamp": "2026-04-24T02:15:28.138Z",
+      "markdown_size_bytes": 656056,
+      "provider": "claude-code",
+      "last_updated": "2026-04-24T09:05:02Z"
+    },
+    "84b5f3a0-58a9-4656-ab30-aa58635aea1f": {
+      "user_message_count": 4,
+      "agent_message_count": 80,
+      "start_timestamp": "2026-04-24T02:30:59.508Z",
+      "end_timestamp": "2026-04-24T02:47:02.193Z",
+      "markdown_size_bytes": 76900,
+      "provider": "claude-code",
+      "last_updated": "2026-04-24T09:05:02Z"
     },
     "ec96180f-4db3-4c17-af1e-beca7f1830af": {
-      "user_message_count": 9,
-      "agent_message_count": 150,
+      "user_message_count": 11,
+      "agent_message_count": 250,
       "start_timestamp": "2026-04-23T13:15:02+10:00",
       "end_timestamp": "2026-04-23T13:15:02+10:00",
-      "markdown_size_bytes": 124034,
+      "markdown_size_bytes": 196625,
       "provider": "cursoride",
-      "last_updated": "2026-04-23T11:08:49Z"
+      "last_updated": "2026-04-24T09:05:30Z"
     }
   }
 }

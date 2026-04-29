@@ -201,6 +201,60 @@
       <div id="mic-error" class="mic-error-banner" role="alert" hidden></div>
     </footer>
 
+    <div
+      id="shortcuts-modal"
+      class="modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="shortcuts-modal-title"
+      hidden
+    >
+      <div class="modal__backdrop" data-action="close-shortcuts-modal"></div>
+      <div class="modal__card">
+        <h2 id="shortcuts-modal-title" class="modal__title">Keyboard shortcuts</h2>
+        <div class="modal__body">
+          <table class="shortcuts-table">
+            <thead>
+              <tr><th>Key</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="2" class="shortcuts-table__group">Navigation</td></tr>
+              <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Previous / next phoneme</td></tr>
+              <tr><td><kbd>G</kbd></td><td>Play reference audio</td></tr>
+              <tr><td><kbd>E</kbd></td><td>Export bank</td></tr>
+
+              <tr><td colspan="2" class="shortcuts-table__group">Recording / takes</td></tr>
+              <tr><td><kbd>R</kbd></td><td>Start / stop recording</td></tr>
+              <tr><td><kbd>Space</kbd></td><td>Play selected take</td></tr>
+              <tr><td><kbd>Enter</kbd></td><td>Toggle keeper on selected take</td></tr>
+              <tr><td><kbd>Backspace</kbd></td><td>Delete selected take (confirm with <kbd>Enter</kbd>)</td></tr>
+
+              <tr><td colspan="2" class="shortcuts-table__group">Trim — playhead</td></tr>
+              <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Nudge playhead ±10 ms</td></tr>
+              <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> / <kbd>→</kbd></td><td>Nudge playhead ±100 ms</td></tr>
+              <tr><td><kbd>Home</kbd> / <kbd>End</kbd></td><td>Jump playhead to clip start / end</td></tr>
+              <tr><td><kbd>,</kbd> / <kbd>.</kbd></td><td>Jump playhead to trim start / end</td></tr>
+
+              <tr><td colspan="2" class="shortcuts-table__group">Trim — edit</td></tr>
+              <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td>Set trim start / end at playhead</td></tr>
+              <tr><td><kbd>Alt</kbd>+<kbd>←</kbd> / <kbd>→</kbd></td><td>Nudge nearest handle ±10 ms</td></tr>
+              <tr><td><kbd>P</kbd></td><td>Play trimmed selection</td></tr>
+              <tr><td><kbd>S</kbd></td><td>Save trim as new take</td></tr>
+              <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>Z</kbd></td><td>Undo trim edit</td></tr>
+              <tr><td><kbd>Cmd/Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Redo trim edit</td></tr>
+
+              <tr><td colspan="2" class="shortcuts-table__group">This dialog</td></tr>
+              <tr><td><kbd>?</kbd> or <kbd>Shift</kbd>+<kbd>?</kbd></td><td>Show this cheatsheet</td></tr>
+              <tr><td><kbd>Esc</kbd></td><td>Close</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="modal__actions">
+          <button type="button" class="modal__btn" data-action="close-shortcuts-modal">Close</button>
+        </div>
+      </div>
+    </div>
+
     <script type="module" src="/ui/main.js"></script>
   </body>
 </html>

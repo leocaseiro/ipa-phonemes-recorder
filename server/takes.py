@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 TAKE_ID_RE = re.compile(r"^take-(\d+)$")
 FFMPEG_TIMEOUT_SECONDS = 30
+MIN_TRIM_MS = 10
 
 
 @dataclass
@@ -49,6 +50,82 @@ class TakeNotFound(Exception):
         self.phoneme_id = phoneme_id
         self.take_id = take_id
         super().__init__(f"take not found: {phoneme_id}/{take_id}")
+
+
+def _finalize_wav(
+    *,
+    bank_path: Path,
+    phoneme_id: str,
+    take_id: str,
+    wav_path: Path,
+    tmp_cleanup: Path | None,
+    source_take_id: str | None = None,
+) -> TakeMeta:
+    """Measure a freshly written WAV, append it to state, return meta.
+
+    Shared tail of save_take and trim_take. `wav_path` must already
+    exist on disk. `tmp_cleanup`, if given, is unlinked after state
+    is written (best-effort). `source_take_id` is persisted on the
+    take entry when non-None (provenance for trims).
+    """
+    try:
+        peak_db, rms_db, duration_ms = compute_peak_rms(wav_path)
+    except Exception as exc:
+        wav_path.unlink(missing_ok=True)
+        raise TakeSaveFailed(
+            "wav_unreadable",
+            "transcoded WAV could not be measured",
+            detail=str(exc),
+            tmp_path=tmp_cleanup,
+        ) from exc
+
+    created_at = (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+    state = read_state(bank_path)
+    phonemes = state.setdefault("phonemes", {})
+    if phoneme_id not in phonemes:
+        phonemes[phoneme_id] = {"keeper_take": None, "takes": []}
+    phoneme_entry = phonemes[phoneme_id]
+    phoneme_entry.setdefault("keeper_take", None)
+    phoneme_entry.setdefault("takes", [])
+
+    take_entry: dict = {
+        "id": take_id,
+        "created_at": created_at,
+        "duration_ms": duration_ms,
+        "peak_db": peak_db,
+        "rms_db": rms_db,
+        "notes": "",
+    }
+    if source_take_id is not None:
+        take_entry["source_take_id"] = source_take_id
+    phoneme_entry["takes"].append(take_entry)
+
+    new_number = int(take_id.removeprefix("take-"))
+    current_high = phoneme_entry.get("max_take_id")
+    if not isinstance(current_high, int) or new_number > current_high:
+        phoneme_entry["max_take_id"] = new_number
+    state["last_phoneme_id"] = phoneme_id
+    write_state(bank_path, state)
+
+    if tmp_cleanup is not None:
+        try:
+            tmp_cleanup.unlink(missing_ok=True)
+        except OSError as exc:
+            logger.warning("could not clean up %s: %s", tmp_cleanup, exc)
+
+    return TakeMeta(
+        take_id=take_id,
+        duration_ms=duration_ms,
+        peak_db=peak_db,
+        rms_db=rms_db,
+        created_at=created_at,
+    )
 
 
 def next_take_id(phoneme_dir: Path, state: dict, phoneme_id: str) -> str:
@@ -133,58 +210,95 @@ def save_take(
             tmp_path=tmp_src,
         )
 
-    try:
-        peak_db, rms_db, duration_ms = compute_peak_rms(wav_path)
-    except Exception as exc:
-        wav_path.unlink(missing_ok=True)
+    return _finalize_wav(
+        bank_path=bank_path,
+        phoneme_id=phoneme_id,
+        take_id=take_id,
+        wav_path=wav_path,
+        tmp_cleanup=tmp_src,
+    )
+
+
+def trim_take(
+    *,
+    bank_path: Path,
+    phoneme_id: str,
+    source_take_id: str,
+    start_ms: int,
+    end_ms: int,
+    ffmpeg: Path,
+) -> TakeMeta:
+    """Create a new take from a trimmed region of an existing take.
+
+    The source WAV is never modified. The new take is appended with
+    a `source_take_id` field for provenance. Validation failures
+    raise TakeSaveFailed with code `trim_invalid_range`.
+    """
+    if not TAKE_ID_RE.match(source_take_id):
+        raise TakeNotFound(phoneme_id, source_take_id)
+
+    source_wav = bank_path / "raw" / phoneme_id / f"{source_take_id}.wav"
+    if not source_wav.is_file():
+        raise TakeNotFound(phoneme_id, source_take_id)
+
+    _, _, source_duration_ms = compute_peak_rms(source_wav)
+
+    if (
+        not isinstance(start_ms, int)
+        or not isinstance(end_ms, int)
+        or start_ms < 0
+        or end_ms <= start_ms
+        or end_ms > source_duration_ms
+        or (end_ms - start_ms) < MIN_TRIM_MS
+    ):
         raise TakeSaveFailed(
-            "wav_unreadable",
-            "transcoded WAV could not be measured",
-            detail=str(exc),
-            tmp_path=tmp_src,
+            "trim_invalid_range",
+            f"invalid trim range: start={start_ms} end={end_ms} "
+            f"source_duration={source_duration_ms}",
+        )
+
+    phoneme_dir = bank_path / "raw" / phoneme_id
+    state = read_state(bank_path)
+    new_take_id = next_take_id(phoneme_dir, state, phoneme_id)
+    wav_path = phoneme_dir / f"{new_take_id}.wav"
+
+    start_s = start_ms / 1000.0
+    end_s = end_ms / 1000.0
+
+    try:
+        result = subprocess.run(
+            [
+                str(ffmpeg), "-y", "-i", str(source_wav),
+                "-ss", f"{start_s:.3f}", "-to", f"{end_s:.3f}",
+                "-ar", "48000", "-ac", "1", "-c:a", "pcm_s16le",
+                str(wav_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise TakeSaveFailed(
+            "ffmpeg_timeout",
+            f"ffmpeg timed out after {FFMPEG_TIMEOUT_SECONDS}s",
         ) from exc
 
-    created_at = (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    if result.returncode != 0:
+        if wav_path.exists():
+            wav_path.unlink()
+        raise TakeSaveFailed(
+            "ffmpeg_failed",
+            "trimming failed",
+            detail=result.stderr[-1500:],
+        )
 
-    phonemes = state.setdefault("phonemes", {})
-    if phoneme_id not in phonemes:
-        phonemes[phoneme_id] = {"keeper_take": None, "takes": []}
-    phoneme_entry = phonemes[phoneme_id]
-    phoneme_entry.setdefault("keeper_take", None)
-    phoneme_entry.setdefault("takes", [])
-    phoneme_entry["takes"].append(
-        {
-            "id": take_id,
-            "created_at": created_at,
-            "duration_ms": duration_ms,
-            "peak_db": peak_db,
-            "rms_db": rms_db,
-            "notes": "",
-        }
-    )
-    new_number = int(take_id.removeprefix("take-"))
-    current_high = phoneme_entry.get("max_take_id")
-    if not isinstance(current_high, int) or new_number > current_high:
-        phoneme_entry["max_take_id"] = new_number
-    state["last_phoneme_id"] = phoneme_id
-    write_state(bank_path, state)
-
-    try:
-        tmp_src.unlink(missing_ok=True)
-    except OSError as exc:
-        logger.warning("could not clean up %s: %s", tmp_src, exc)
-
-    return TakeMeta(
-        take_id=take_id,
-        duration_ms=duration_ms,
-        peak_db=peak_db,
-        rms_db=rms_db,
-        created_at=created_at,
+    return _finalize_wav(
+        bank_path=bank_path,
+        phoneme_id=phoneme_id,
+        take_id=new_take_id,
+        wav_path=wav_path,
+        tmp_cleanup=None,
+        source_take_id=source_take_id,
     )
 
 
